@@ -8,3 +8,5 @@ require (
 	github.com/coder/websocket v1.8.15
 	golang.org/x/crypto v0.58.0
 )
+
+require golang.org/x/image v0.46.0 // indirect
