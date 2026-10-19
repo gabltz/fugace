@@ -21,7 +21,7 @@ func TestHandler(t *testing.T) {
 		{"healthz post", http.MethodPost, "/healthz", http.StatusMethodNotAllowed, ""},
 		{"unknown path", http.MethodGet, "/nope", http.StatusNotFound, ""},
 	}
-	h := NewHandler()
+	h := NewHandler(Options{})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
