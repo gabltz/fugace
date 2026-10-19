@@ -100,7 +100,7 @@ jobs:
         # set SMOKE_IRC=1 from M1, SMOKE_TLS=1 from M3
         run: SMOKE_IRC=0 SMOKE_TLS=0 ./scripts/smoke.sh fugace:ci
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: fugace:ci
           severity: HIGH,CRITICAL
