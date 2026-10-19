@@ -4,7 +4,7 @@ Chat éphémère, sans compte, sans logs, compatible IRC, avec partage d'images 
 Un binaire Go statique, une image `scratch` d'environ 13 Mo, zéro configuration. Supprimez le conteneur : tout a disparu.
 
 - Un pseudo suffit : pas de compte, pas d'e-mail.
-- Client web intégré (HTTPS) et clients IRC natifs (WeeChat, irssi, HexChat…) sur le même serveur.
+- Client web intégré (HTTPS), en verre dépoli, animé, thèmes clair et sombre, et clients IRC natifs (WeeChat, irssi, HexChat…) sur le même serveur.
 - Rien n'est écrit sur disque, rien n'est journalisé. L'historique des salons et les fichiers vivent en RAM.
 - Les images sont ré-encodées (EXIF/GPS supprimés) ; aucune IP n'est visible des autres participants ; DCC est bloqué.
 
@@ -130,6 +130,10 @@ docker buildx imagetools inspect ghcr.io/gabltz/fugace:0.1.0 --format '{{json .S
 
 `make check` (lint, tests `-race`, govulncheck), `make fuzz`, `make smoke`, `make clients` (WeeChat et irssi réels), `make browser` (Chromium headless), `make acme` (pebble). Conventions : [`AGENTS.md`](AGENTS.md) ; décisions : [`docs/adr/`](docs/adr/).
 
+## Apparence du client web
+
+Le bouton ☀ (en haut à droite) règle le thème (Auto, Clair, Sombre) et les animations (Auto, Pleines, Réduites). « Auto » suit les réglages du système, y compris « réduire les animations ». Ces choix restent dans le navigateur.
+
 ## Sécurité
 
-Voir [`SECURITY.md`](SECURITY.md) et [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
+Voir [`SECURITY.md`](SECURITY.md) et [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). Composants tiers : [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

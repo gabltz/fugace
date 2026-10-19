@@ -2,6 +2,28 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
+## [0.2.0] - non publiée
+
+Refonte de l'interface web ; le serveur et le protocole sont inchangés.
+
+### Ajouté
+- **Thèmes et surfaces** :
+  - thèmes « Aurora » sombre et verre givré clair, suivant le système, avec réglage Auto/Clair/Sombre ;
+  - interface en verre dépoli, fond animé, halo qui suit le pointeur, bordures animées ;
+  - police Inter embarquée (servie depuis le serveur, aucun CDN).
+- **Conversation** : messages groupés par auteur avec avatars, séparateurs de jour, bouton « Nouveaux messages ».
+- **Animations** :
+  - arrivée des messages en ressort, transitions entre conversations, indicateur de salon coulissant ;
+  - boutons magnétiques et ondulations, visionneuse d'images, particules à l'envoi d'un fichier ;
+  - réglage Auto/Pleines/Réduites, où Auto respecte le choix « réduire les animations » du système.
+
+### Modifié
+- CSP : ajout de `font-src 'self'` pour la police embarquée.
+- Budget du client web : 128 Ko police comprise (au lieu de 60 Ko sans police).
+
+### Corrigé
+- Avec les transitions animées, un message ou un fichier envoyé juste après un changement de conversation pouvait partir dans la précédente.
+
 ## [0.1.0] - 2026-10-19
 
 Première version.
@@ -45,4 +67,5 @@ Première version.
   - ACME contre pebble ;
   - charge, flood et slowloris (`docs/BENCH.md`).
 
+[0.2.0]: https://github.com/gabltz/fugace/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gabltz/fugace/releases/tag/v0.1.0
