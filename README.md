@@ -6,7 +6,7 @@
   <a href="https://github.com/gabltz/fugace/actions/workflows/ci.yml"><img src="https://github.com/gabltz/fugace/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/gabltz/fugace/releases"><img src="https://img.shields.io/github/v/release/gabltz/fugace?sort=semver&logo=github" alt="Release"></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/gabltz/fugace?logo=go&logoColor=white" alt="Go version"></a>
-  <a href="https://goreportcard.com/report/github.com/gabltz/fugace"><img src="https://goreportcard.com/badge/github.com/gabltz/fugace" alt="Go Report Card"></a>
+  <a href="https://pkg.go.dev/github.com/gabltz/fugace"><img src="https://pkg.go.dev/badge/github.com/gabltz/fugace.svg" alt="Go Reference"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/gabltz/fugace?color=blue" alt="License: AGPL-3.0"></a>
 </p>
 <p align="center">
