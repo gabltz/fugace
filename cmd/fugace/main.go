@@ -21,6 +21,7 @@ import (
 	"github.com/gabltz/fugace/internal/server"
 	"github.com/gabltz/fugace/internal/transport"
 	"github.com/gabltz/fugace/internal/web"
+	webui "github.com/gabltz/fugace/web"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -118,7 +119,13 @@ func listen(cfg *config.Config) (*app, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listen http: %w", err)
 	}
-	a := &app{httpLn: httpLn, httpSrv: web.NewServer(web.NewHandler()), chat: chat}
+	static, err := web.NewStatic(webui.Static, "static")
+	if err != nil {
+		_ = httpLn.Close()
+		return nil, fmt.Errorf("web client: %w", err)
+	}
+	handler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(chat)})
+	a := &app{httpLn: httpLn, httpSrv: web.NewServer(handler), chat: chat}
 	if cfg.IRCAddr != "" {
 		if a.ircLn, err = lc.Listen(context.Background(), "tcp", cfg.IRCAddr); err != nil {
 			_ = httpLn.Close()
