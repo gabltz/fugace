@@ -79,6 +79,17 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [x] Vérification `cosign verify` documentée dans le README
 - **Acceptation** : `docker run ghcr.io/gabltz/fugace:0.1.0` fonctionne sur amd64 et arm64.
 
+## M7 — Refonte de l'interface web (v0.2.0)
+
+- [x] ADR 0010 : direction visuelle, police embarquée et budget, `font-src 'self'`
+- [x] Thèmes Aurora sombre / verre clair, réglage Auto/Clair/Sombre sans flash au chargement
+- [x] Verre dépoli, fond animé, halo, bordures animées, messages groupés avec avatars, séparateurs de jour
+- [x] Animations (ressort, View Transitions, indicateur coulissant, boutons magnétiques, ondulations, visionneuse, particules) et réglage Auto/Pleines/Réduites
+- [x] Mobile : tiroirs animés, bouton d'apparence intégré
+- [x] Tests navigateur : thème et animations (préférences système, choix gardés), visionneuse, envoi juste après un changement de conversation ; axe à 0 violation
+- [ ] Tag `v0.2.0`
+- **Acceptation** : toute la suite navigateur, les clients IRC et le smoke passent ; budget ≤ 128 Ko ; aucune violation CSP ni erreur console ; axe sans violation en clair, en sombre et sur mobile.
+
 ## Backlog (post v0.1)
 
 - Rendu des codes de formatage IRC (gras/italique/couleurs)
