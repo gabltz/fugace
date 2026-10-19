@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-const BASE = process.env.BASE || 'http://fugace-it:8080';
+const BASE = process.env.BASE || 'https://fugace-it:8443';
 const [IRC_HOST, IRC_PORT] = (process.env.IRC || 'fugace-it:6667').split(':');
 const ORIGIN = new URL(BASE).origin;
 const failures = [];
@@ -99,7 +99,7 @@ const texts = (page) => page.$$eval('#messages .line .text', (els) => els.map((e
   tcp.send('PRIVMSG #general :said before the web user arrived');
 
   // Desktop
-  const desk = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const desk = await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true }); // self-signed
   const page = await desk.newPage();
   watch(page, sink);
   await page.goto(BASE);
@@ -142,7 +142,7 @@ const texts = (page) => page.$$eval('#messages .line .text', (els) => els.map((e
   await axe(page, 'chat');
 
   // Mobile
-  const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true });
   const mpage = await mob.newPage();
   watch(mpage, sink);
   await login(mpage, 'mobileuser');

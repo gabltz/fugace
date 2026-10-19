@@ -29,6 +29,9 @@ if [ "${SMOKE_TLS:-0}" = "1" ]; then
   echo "ok: https (self-signed)"
   docker exec "$NAME" /fugace status | grep -qi 'self-signed' || { echo "status: unexpected tls mode"; exit 1; }
   echo "ok: status"
+  out=$(printf 'NICK smoketls\r\nUSER s 0 * :s\r\nQUIT\r\n' | timeout 5 openssl s_client -quiet -connect 127.0.0.1:16697 2>/dev/null || true)
+  echo "$out" | grep -q ' 001 smoketls ' || { echo "IRC over TLS welcome missing"; exit 1; }
+  echo "ok: irc over tls"
 fi
 
 # IRC registration (enabled from M1 onward)
