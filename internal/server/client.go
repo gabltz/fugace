@@ -50,6 +50,8 @@ type client struct {
 	capNeg       bool
 	pass         string
 	operFailures int
+	uploadToken  string
+	uploadRevoke func() // read by disconnect after the reader has exited
 	connectedAt  time.Time
 
 	msgBucket, joinBucket, nickBucket, cmdBucket *limits.Bucket
