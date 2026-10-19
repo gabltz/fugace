@@ -22,15 +22,15 @@
 | ID | Menace | Parade | Test |
 |----|--------|--------|------|
 | T1 | A5 retrouve des messages/IP sur disque ou dans les logs Docker | Aucune écriture disque, rootfs RO, `logging: none`, forbidigo, pas de swap | Test d'intégration : exécution + upload puis `docker diff` vide, `docker logs` vide |
-| T2 | A2 récupère l'IP d'un autre participant | Hostmask masqué, WHOIS/WHO sans IP, DCC bloqué, aucun préchargement de lien externe dans le client web | Tests unitaires WHOIS/WHO/DCC |
+| T2 | A2 récupère l'IP d'un autre participant | Hostmask masqué, WHOIS/WHO sans IP, DCC bloqué, aucun préchargement de lien externe dans le client web | Tests unitaires WHOIS/WHO/DCC — `TestQueries`, `TestWhoisOnlyCommonChannels`, `TestDCCBlocked`, `noIP` (tous les tests serveur), `scripts/clients/run.sh` |
 | T3 | A2 injecte du HTML/JS dans le client web | Rendu `textContent` uniquement, CSP stricte sans inline, pas d'`innerHTML` (règle de revue + grep CI) | Test navigateur headless avec charges XSS classiques |
 | T4 | A3 sert du HTML/SVG exécutable depuis notre origine | Sniff du contenu, ré-encodage des images, tout le reste en `attachment` + `octet-stream` + `nosniff` + CSP `sandbox` | Tests avec polyglotte GIF/HTML, SVG avec script |
 | T5 | A3 bombe de décompression (PNG 50000×50000) | `DecodeConfig` + plafond 25 MP avant décodage | Test unitaire avec fichier forgé |
 | T6 | A3 épuise la RAM via uploads | Taille max/fichier, budget global, éviction, rate-limit, jeton lié à une connexion | Test de charge |
-| T7 | A1/A2 déni de service (flood, slowloris, connexions massives) | Timeouts, limites de §6 ARCHITECTURE, SendQ borné, limite par IP hachée | Test de charge + slowloris |
-| T8 | A2 fait planter le parseur | Parseur fuzzé (go fuzz), recover par connexion | Corpus de fuzz en CI |
+| T7 | A1/A2 déni de service (flood, slowloris, connexions massives) | Timeouts, limites de §6 ARCHITECTURE, SendQ borné, limite par IP hachée | Test de charge + slowloris — `TestSendQExceeded`, `TestFakeLag`, `TestPerSourceLimit`, `TestRegistrationTimeout`, `TestPingTimeout`, `TestConnsLimits` (charge/slowloris : M5) |
+| T8 | A2 fait planter le parseur | Parseur fuzzé (go fuzz), recover par connexion | Corpus de fuzz en CI — `FuzzParse`, `FuzzDispatch`, `FuzzLoad`, `TestRecoverAbortsWithoutOutput` |
 | T9 | A1 utilise fugace comme hébergeur de fichiers public | Upload impossible sans connexion IRC/WS vivante, TTL court | Test : jeton invalide après QUIT |
-| T10 | A2 usurpe un pseudo via variantes de casse/Unicode | Pseudos ASCII stricts, CASEMAPPING=ascii | Tests unitaires |
+| T10 | A2 usurpe un pseudo via variantes de casse/Unicode | Pseudos ASCII stricts, CASEMAPPING=ascii | Tests unitaires — `TestValidNick`, `TestFold`, `TestNickCollisionAndCase` |
 | T11 | A4 lit le trafic | HTTPS intégré par défaut (HTTP = redirection), IRC TLS 6697 ; documenter que 6667 est en clair | Test : toute requête HTTP hors ACME/healthz → 301 |
 | T12 | Chaîne d'approvisionnement | 3 dépendances max, `go.sum`, govulncheck, actions épinglées par SHA, image de base par digest, SBOM + provenance + signature cosign | CI |
 | T13 | Évasion conteneur | `scratch`, non-root, cap_drop ALL, no-new-privileges, rootfs RO | Trivy + revue compose |
@@ -39,8 +39,8 @@
 | T16 | A5 récupère la clé privée TLS | Clé en RAM uniquement (cache opt-in en 0600) | `docker diff` vide sans cache |
 | T17 | Quotas Let's Encrypt épuisés (recréations répétées) → service indisponible | Repli autosigné immédiat, backoff, cache opt-in, statut consultable | Test avec directory ACME simulé (pebble) renvoyant `rateLimited` |
 | T18 | A1 abuse du handler `http-01` | Ne répond qu'aux jetons en cours, réponse de taille fixe | Test unitaire |
-| T19 | A2 crée/supprime des salons ou vide l'historique sans être admin, ou devine le mot de passe admin | Commandes réservées à `OPER`, comparaison temps constant, déconnexion après 5 échecs | Tests unitaires OPER/DELCHAN/CLEARHISTORY |
-| T20 | A2 épuise la RAM via l'historique | Budget global `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien, rate-limit des messages | Test unitaire du budget |
+| T19 | A2 crée/supprime des salons ou vide l'historique sans être admin, ou devine le mot de passe admin | Commandes réservées à `OPER`, comparaison temps constant, déconnexion après 5 échecs | Tests unitaires OPER/DELCHAN/CLEARHISTORY — `TestAdmin`, `TestOperBruteForceDisconnects`, `TestNoAdminConfigured` |
+| T20 | A2 épuise la RAM via l'historique | Budget global `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien, rate-limit des messages | Test unitaire du budget — `TestHistoryBudget`, `TestHistoryDisabledAndOversized` |
 
 ## Limites assumées (à écrire dans le README)
 

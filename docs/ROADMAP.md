@@ -14,17 +14,17 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M1 — Cœur IRC (TCP)
 
-- [ ] `internal/irc` : parseur/sérialiseur (tags, préfixe, params, trailing), validation pseudos/salons, constantes numerics
-- [ ] Fuzz du parseur (`FuzzParse`) + round-trip parse/serialize
-- [ ] Enregistrement NICK/USER/CAP/PASS, 001–005, 422, timeout 30 s
-- [ ] PING/PONG bidirectionnel, timeout 180 s
-- [ ] JOIN/PART/PRIVMSG/NOTICE/QUIT/NAMES/TOPIC/LIST/WHO/WHOIS/MODE/MOTD/LUSERS/VERSION/TIME
-- [ ] Blocage CTCP DCC
-- [ ] Caps `echo-message`, `server-time`
-- [ ] Historique de salon en RAM (budget, rejeu au JOIN) et admin (`OPER`, salons admin seulement, `DELCHAN`, `CLEARHISTORY`) — ADR 0003
-- [ ] Files d'envoi bornées, SendQ exceeded
-- [ ] Limites anti-abus (ARCHITECTURE §6), rate-limit par IP hachée
-- [ ] Tests d'intégration en Go : N clients TCP simulés, scénario complet
+- [x] `internal/irc` : parseur/sérialiseur (tags, préfixe, params, trailing), validation pseudos/salons, constantes numerics
+- [x] Fuzz du parseur (`FuzzParse`) + round-trip parse/serialize
+- [x] Enregistrement NICK/USER/CAP/PASS, 001–005, 422, timeout 30 s
+- [x] PING/PONG bidirectionnel, timeout 180 s
+- [x] JOIN/PART/PRIVMSG/NOTICE/QUIT/NAMES/TOPIC/LIST/WHO/WHOIS/MODE/MOTD/LUSERS/VERSION/TIME
+- [x] Blocage CTCP DCC
+- [x] Caps `echo-message`, `server-time`
+- [x] Historique de salon en RAM (budget, rejeu au JOIN) et admin (`OPER`, salons admin seulement, `DELCHAN`, `CLEARHISTORY`) — ADR 0003
+- [x] Files d'envoi bornées, SendQ exceeded
+- [x] Limites anti-abus (ARCHITECTURE §6), rate-limit par IP hachée
+- [x] Tests d'intégration en Go : N clients TCP simulés, scénario complet
 - **Acceptation** : WeeChat et irssi se connectent, rejoignent `#general`, échangent, changent de pseudo, MP OK. Aucun log.
 
 ## M2 — WebSocket + client web
