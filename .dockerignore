@@ -1,0 +1,10 @@
+.git
+.github
+docs
+*.md
+!web/**
+dist
+bin
+coverage.*
+testdata/fuzz/**/corpus
+.env*

@@ -1,0 +1,37 @@
+services:
+  fugace:
+    build:
+      context: .
+    image: fugace:local
+    container_name: fugace
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    memswap_limit: 512m   # = mem_limit: RAM never swapped to disk
+    pids_limit: 128
+    ulimits:
+      core: 0
+      nofile:
+        soft: 4096
+        hard: 4096
+    logging:
+      driver: none        # nolog at the Docker level as well
+    ports:
+      - "80:8080"         # http: redirect to https + ACME http-01
+      - "443:8443"        # https: web client, websocket, files
+      - "6667:6667"       # irc (plaintext)
+      - "6697:6697"       # irc over tls (same certificate as https)
+    # Everything below is optional. Without it: self-signed HTTPS, works on any IP.
+    # environment:
+    #   FUGACE_HOST: "203.0.113.10"            # public IP and/or domain(s) -> Let's Encrypt cert
+    #   FUGACE_PASSWORD: "change-me"           # shared server password
+    #   FUGACE_CERT_CACHE: "/cache"            # keep the ACME cert across re-creations (see below)
+    # volumes:
+    #   - ./certs:/certs:ro                    # your own certificate (tls.crt + tls.key)
+    #   - fugace-cache:/cache                  # only with FUGACE_CERT_CACHE
+# volumes:
+#   fugace-cache:

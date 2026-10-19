@@ -1,0 +1,108 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# TODO(M0): pin every `uses:` to a full commit SHA, keep the tag as a trailing comment.
+jobs:
+  guard:
+    name: repo hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: No tool attribution in files or commit messages
+        run: |
+          # Bracketed letters keep this file from matching its own pattern.
+          pat='cl[a]ude|anthr[o]pic|co-author[e]d-by|gener[a]ted with'
+          if git grep -nIiE "$pat" -- . ; then
+            echo "::error::forbidden mention found in tracked files"; exit 1
+          fi
+          if git log --format='%H%n%B' | grep -niE "$pat"; then
+            echo "::error::forbidden mention found in commit messages"; exit 1
+          fi
+      - name: No dangerous DOM sinks in the web client
+        run: |
+          if grep -rnE 'innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(' web/static 2>/dev/null; then
+            echo "::error::forbidden DOM sink"; exit 1
+          fi
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go mod verify
+      - run: go test -race -count=1 ./...
+      - name: Short fuzzing pass
+        run: make fuzz FUZZTIME=15s
+
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  image:
+    needs: [guard, lint, test, vuln]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: fugace:ci
+          build-args: VERSION=${{ github.sha }}
+      - name: Image size budget (< 20 MB)
+        run: |
+          size=$(docker image inspect fugace:ci --format '{{.Size}}')
+          echo "image size: $size bytes"
+          test "$size" -lt 20971520
+      - name: Smoke test
+        # set SMOKE_IRC=1 from M1, SMOKE_TLS=1 from M3
+        run: SMOKE_IRC=0 SMOKE_TLS=0 ./scripts/smoke.sh fugace:ci
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: fugace:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
