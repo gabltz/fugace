@@ -60,8 +60,9 @@ La réponse JSON contient l'URL à coller dans le salon. Les images sont ré-enc
 
 - Votre client IRC journalise probablement en local : c'est hors de portée du serveur.
 - Le port 6667 est en clair ; préférez 6697 ou le web derrière HTTPS.
-- Si vous ajoutez un reverse proxy devant (`FUGACE_TLS=off`), désactivez ses logs d'accès pour ce site.
+- Si vous ajoutez un reverse proxy devant (`FUGACE_TLS=off`), désactivez ses logs d'accès pour ce site et déclarez-le dans `FUGACE_TRUSTED_PROXIES` : sinon toutes les connexions semblent venir de lui et partagent sa limite par source.
 - Sans `FUGACE_PASSWORD`, n'importe qui peut entrer.
+- Limites anti-abus (connexions par source, débits, tailles) : `docs/ARCHITECTURE.md` §6 ; mesures de charge : `docs/BENCH.md`.
 
 ## Configuration optionnelle
 

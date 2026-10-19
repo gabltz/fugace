@@ -62,13 +62,13 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M5 — Durcissement
 
-- [ ] `FUGACE_PASSWORD` (IRC PASS + invite web), comparaison temps constant
-- [ ] `FUGACE_TRUSTED_PROXIES` pour `X-Forwarded-For`
-- [ ] Revue complète du THREAT_MODEL : chaque ligne a son test, cocher la colonne
-- [ ] Test de charge (500 clients, 50 msg/s) : RAM, CPU, latence documentées dans `docs/BENCH.md`
-- [ ] Test slowloris + flood
-- [ ] `scripts/smoke.sh` étendu : upload, `docker diff` vide, `docker logs` vide
-- [ ] Optionnel : faire passer un sous-ensemble pertinent de la suite `irctest` et documenter les écarts
+- [x] `FUGACE_PASSWORD` (IRC PASS + invite web), comparaison temps constant
+- [x] `FUGACE_TRUSTED_PROXIES` pour `X-Forwarded-For`
+- [x] Revue complète du THREAT_MODEL : chaque ligne a son test, cocher la colonne
+- [x] Test de charge (500 clients, 50 msg/s) : RAM, CPU, latence documentées dans `docs/BENCH.md`
+- [x] Test slowloris + flood
+- [x] `scripts/smoke.sh` étendu : upload, `docker diff` vide, `docker logs` vide
+- [ ] Optionnel : faire passer un sous-ensemble pertinent de la suite `irctest` et documenter les écarts — non fait en v0.1.0, raisons dans l'ADR 0009 (D32)
 - **Acceptation** : toutes les lignes du modèle de menace testées ; Trivy 0 HIGH/CRITICAL.
 
 ## M6 — Release v0.1.0

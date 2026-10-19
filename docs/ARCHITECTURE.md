@@ -69,7 +69,7 @@ scripts/smoke.sh            test fumée conteneur (HTTP + IRC)
 | Limite | Valeur |
 |--------|--------|
 | Connexions simultanées totales | 1000 |
-| Connexions par source (IP hachée) | 10 |
+| Connexions par source (IP hachée) | 10 (IRC/WS) ; 32 en HTTP/HTTPS, 1024 au total (ADR 0009) |
 | Messages par client | burst 10, puis 2/s |
 | Commandes JOIN par client | burst 5, puis 1/5 s |
 | Changements de pseudo | burst 3, puis 1/10 s |
