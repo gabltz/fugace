@@ -29,12 +29,12 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M2 — WebSocket + client web
 
-- [ ] Transport WS (`text.ircv3.net`), vérification Origin, limite 4 Ko
-- [ ] Client web vanilla : écran pseudo, salons/MP, membres, commandes slash, reconnexion, thème, mobile
-- [ ] Auto-join `#general` côté client web
-- [ ] Affichage de l'historique rejoué, champ « mot de passe admin », commandes `/delchan` `/clearhistory`
-- [ ] Assets embarqués, ETag, CSP stricte, aucun inline
-- [ ] Tests : web ↔ IRC TCP dans le même salon
+- [x] Transport WS (`text.ircv3.net`), vérification Origin, limite 4 Ko
+- [x] Client web vanilla : écran pseudo, salons/MP, membres, commandes slash, reconnexion, thème, mobile
+- [x] Auto-join `#general` côté client web
+- [x] Affichage de l'historique rejoué, champ « mot de passe admin », commandes `/delchan` `/clearhistory`
+- [x] Assets embarqués, ETag, CSP stricte, aucun inline
+- [x] Tests : web ↔ IRC TCP dans le même salon
 - **Acceptation** : un utilisateur web et un utilisateur WeeChat discutent dans `#general` ; lighthouse/axe sans erreur bloquante ; poids front < 60 Ko.
 
 ## M3 — HTTPS autonome (web servi directement sur l'hôte, y compris sur IP)
