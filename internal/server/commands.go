@@ -235,6 +235,7 @@ func (s *Server) tryRegister(c *client) (bool, string) {
 		return false, ""
 	}
 	if s.opts.Password != "" && subtle.ConstantTimeCompare([]byte(c.pass), []byte(s.opts.Password)) != 1 {
+		c.wait(s.opts.OperFailureDelay) // slows down guessing; then the connection is closed
 		c.reply(s.numeric(c, irc.ErrPasswdMismatch, "Password incorrect"))
 		return true, "Bad password"
 	}
