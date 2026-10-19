@@ -56,8 +56,9 @@ func (w *wsConn) Close() error {
 }
 
 // WSHandler serves IRC over WebSocket. Only same-origin browsers (or
-// clients sending no Origin) are accepted.
-func WSHandler(srv *server.Server) http.Handler {
+// clients sending no Origin) are accepted. trusted lists the reverse proxies
+// whose X-Forwarded-For is believed, for the per-source limit only.
+func WSHandler(srv *server.Server, trusted []netip.Prefix) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The http.Server deadlines would survive the hijack and kill the
 		// connection after ReadTimeout: idle is handled by IRC PING instead.
@@ -74,14 +75,53 @@ func WSHandler(srv *server.Server) http.Handler {
 		}
 		c.SetReadLimit(limits.MaxWSMessage)
 		ctx, cancel := context.WithCancel(context.Background())
-		srv.ServeConn(&wsConn{c: c, ctx: ctx, cancel: cancel}, server.ConnInfo{Addr: requestAddr(r), Kind: server.KindWeb})
+		srv.ServeConn(&wsConn{c: c, ctx: ctx, cancel: cancel}, server.ConnInfo{Addr: ClientAddr(r, trusted), Kind: server.KindWeb})
 	})
 }
 
-// requestAddr returns the peer IP of r; it is only hashed, never kept.
-func requestAddr(r *http.Request) netip.Addr {
-	if ap, err := netip.ParseAddrPort(r.RemoteAddr); err == nil {
-		return ap.Addr()
+// maxForwarded bounds the X-Forwarded-For entries examined.
+const maxForwarded = 16
+
+// ClientAddr returns the address used for the per-source limit: the TCP
+// peer, unless the peer is a trusted proxy, in which case X-Forwarded-For is
+// walked from the right and the first untrusted address wins. A malformed
+// header falls back to the peer, so forging it never helps. The address is
+// only hashed, never kept.
+func ClientAddr(r *http.Request, trusted []netip.Prefix) netip.Addr {
+	ap, err := netip.ParseAddrPort(r.RemoteAddr)
+	if err != nil {
+		return netip.Addr{}
 	}
-	return netip.Addr{}
+	peer := ap.Addr().Unmap()
+	if !isTrusted(peer, trusted) {
+		return peer
+	}
+	var hops []string
+	for _, h := range r.Header.Values("X-Forwarded-For") {
+		hops = append(hops, strings.Split(h, ",")...)
+	}
+	if len(hops) > maxForwarded {
+		hops = hops[len(hops)-maxForwarded:]
+	}
+	client := peer
+	for i := len(hops) - 1; i >= 0; i-- {
+		ip, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			return peer
+		}
+		client = ip.Unmap()
+		if !isTrusted(client, trusted) {
+			return client
+		}
+	}
+	return client
+}
+
+func isTrusted(ip netip.Addr, trusted []netip.Prefix) bool {
+	for _, p := range trusted {
+		if p.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
