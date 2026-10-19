@@ -1,0 +1,2 @@
+go test fuzz v1
+string("OPER admin pw-pw-pw\nJOIN #a,#b,#c\nDELCHAN #a\nJOIN #a\nCLEARHISTORY #b\nTOPIC #b :\nWHO #b\nMODE #b +o x")

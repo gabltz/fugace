@@ -1,0 +1,2 @@
+go test fuzz v1
+string("NICK a\nUSER a 0 * :a\nJOIN #general\nPRIVMSG #general :\x01ACTION x\x01\nNICK b\nQUIT")
