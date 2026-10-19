@@ -341,7 +341,7 @@
         }
         return info(p.slice(1).join(' '), 'error');
       case '464':
-        if (!st.registered) { st.loginError = 'Mot de passe du serveur incorrect.'; return; }
+        if (!st.registered) { st.loginError = 'Mot de passe du serveur incorrect ou manquant.'; st.needPass = true; return; }
         return info('Mot de passe admin incorrect.', 'error');
       case '381':
         st.admin = true;
@@ -660,6 +660,13 @@
     $('login').hidden = false;
     $('login-error').textContent = error || '';
     $('login-error').hidden = !error;
+    if (st.needPass) {
+      // The server is password-protected: show the field instead of hiding it.
+      st.needPass = false;
+      document.querySelector('#login details').open = true;
+      $('server-pass').focus();
+      return;
+    }
     $('nick').focus();
   }
 
