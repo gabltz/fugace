@@ -32,6 +32,10 @@ jobs:
           if git log --format='%H%n%B' | grep -niE "$pat"; then
             echo "::error::forbidden mention found in commit messages"; exit 1
           fi
+      - name: Supply chain (pinned actions and images, <= 3 dependencies)
+        run: ./scripts/check-supply-chain.sh
+      - name: Container hardening in compose.yaml
+        run: ./scripts/check-compose.sh
       - name: No dangerous DOM sinks in the web client
         run: |
           if grep -rnE 'innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(' web/static 2>/dev/null; then
@@ -61,6 +65,8 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go mod verify
+      - name: go.mod and go.sum are tidy
+        run: go mod tidy -diff
       - run: go test -race -count=1 ./...
       - name: Short fuzzing pass
         run: make fuzz FUZZTIME=15s
