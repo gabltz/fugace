@@ -9,7 +9,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [x] Makefile fonctionnel (`build test lint vuln fuzz check docker smoke`)
 - [x] Dockerfile et compose.yaml fournis : vérifier qu'ils buildent, image < 20 Mo
 - [x] Épingler toutes les actions GitHub par SHA complet (commentaire `# vX.Y.Z` à côté) et les images de base par digest
-- [ ] CI verte de bout en bout
+- [x] CI verte de bout en bout
 - **Acceptation** : `docker compose up -d --build` → `curl http://localhost/healthz` = `ok` ; `docker logs` vide ; `docker diff` vide.
 
 ## M1 — Cœur IRC (TCP)
