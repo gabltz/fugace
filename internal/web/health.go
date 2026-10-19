@@ -25,9 +25,22 @@ func Health(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Options selects what the HTTP handler serves. Nil fields are not routed.
+type Options struct {
+	Static *Static      // web client
+	WS     http.Handler // IRC over WebSocket
+}
+
 // NewHandler returns the HTTP handler tree.
-func NewHandler() http.Handler {
+func NewHandler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc(HealthPath, Health)
+	if opts.Static != nil {
+		mux.HandleFunc("GET /{$}", opts.Static.Index)
+		mux.HandleFunc("GET "+staticPrefix+"{name}", opts.Static.File)
+	}
+	if opts.WS != nil {
+		mux.Handle("GET /ws", opts.WS)
+	}
 	return SecurityHeaders(mux)
 }
