@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="fugace : chat éphémère, sans compte, compatible IRC.">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>fugace</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<main id="login" class="login">
+  <form id="login-form" class="card" novalidate>
+    <h1>fugace</h1>
+    <p class="tagline">Chat éphémère, sans compte. Rien n'est écrit sur disque.</p>
+    <label for="nick">Pseudo</label>
+    <input id="nick" name="nick" autocomplete="nickname" maxlength="30" spellcheck="false" required>
+    <p class="hint" id="nick-hint">Lettres ASCII, chiffres et <code>[]\`_^{|}-</code>, 30 caractères au plus.</p>
+    <details>
+      <summary>Options</summary>
+      <label for="server-pass">Mot de passe du serveur</label>
+      <input id="server-pass" type="password" autocomplete="off">
+      <label for="admin-pass">Mot de passe admin</label>
+      <input id="admin-pass" type="password" autocomplete="off">
+    </details>
+    <label class="check"><input id="remember" type="checkbox"> Se souvenir du pseudo sur cet appareil</label>
+    <p id="login-error" class="error" role="alert" hidden></p>
+    <button type="submit">Entrer</button>
+  </form>
+</main>
+<div id="app" class="app" hidden>
+  <nav id="sidebar" class="sidebar" aria-label="Salons et messages privés">
+    <h2>Salons</h2>
+    <ul id="channels" class="buffers"></ul>
+    <h2>Messages privés</h2>
+    <ul id="queries" class="buffers"></ul>
+    <p class="me">Connecté en tant que <strong id="me-nick"></strong><span id="me-admin" class="badge" hidden>admin</span></p>
+  </nav>
+  <main class="chat" aria-labelledby="buffer-name">
+    <header class="topbar">
+      <button id="toggle-sidebar" class="icon" type="button" aria-label="Salons" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <div class="title">
+        <h1 id="buffer-name">fugace</h1>
+        <p id="topic"></p>
+      </div>
+      <button id="toggle-members" class="icon" type="button" aria-label="Membres" aria-controls="members-panel" aria-expanded="false">👥</button>
+    </header>
+    <p id="status" class="status" role="status" hidden></p>
+    <ol id="messages" class="messages" aria-live="polite" aria-relevant="additions"></ol>
+    <form id="input-form" class="composer">
+      <label for="input" class="sr-only">Message</label>
+      <input id="input" autocomplete="off" placeholder="Message, ou /help" maxlength="2000" spellcheck="true">
+      <button type="submit">Envoyer</button>
+    </form>
+  </main>
+  <aside id="members-panel" class="members" aria-label="Membres">
+    <h2>Membres <span id="member-count"></span></h2>
+    <ul id="members"></ul>
+  </aside>
+</div>
+</body>
+</html>
