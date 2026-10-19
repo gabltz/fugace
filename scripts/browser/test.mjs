@@ -170,6 +170,24 @@ const texts = (page) => page.$$eval('#messages .line .text', (els) => els.map((e
       fail('svg served as ' + JSON.stringify(h));
     } else ok('svg with script: attachment, octet-stream, nosniff, no preview');
   }
+  // v0.2: lightbox on same-origin previews.
+  if (photoURL) {
+    await page.click('#messages img.preview');
+    const open = await page.waitForFunction(() => document.getElementById('lightbox').open, null, { timeout: 3000 }).then(() => true, () => false);
+    await page.keyboard.press('Escape');
+    const closed = await page.waitForFunction(() => !document.getElementById('lightbox').open, null, { timeout: 3000 }).then(() => true, () => false);
+    if (open && closed) ok('lightbox opens on a preview and closes with Escape'); else fail('lightbox');
+  }
+  // v0.2 regression: a line sent right after switching conversation goes to
+  // the new one, even while the view transition is still running.
+  await page.fill('#input', '/msg tcpuser side note');
+  await page.press('#input', 'Enter');
+  await tcp.waitFor(/PRIVMSG tcpuser :side note/);
+  await page.click('#channels button');
+  await page.fill('#input', 'back in general');
+  await page.press('#input', 'Enter');
+  await tcp.waitFor(/:webuser2!web@fugace PRIVMSG #general :back in general/).then(() => ok('message right after a switch goes to the new conversation'), (e) => fail(e.message));
+
   tcp.send('PRIVMSG #general :look http://example.com/tracker.png');
   await page.waitForFunction(() => [...document.querySelectorAll('#messages .text')].some((e) => e.textContent.includes('tracker.png')), null, { timeout: 5000 });
   if (await page.$$eval('#messages img.preview', (is) => is.some((i) => !i.src.startsWith(location.origin)))) fail('external image previewed');
@@ -184,11 +202,34 @@ const texts = (page) => page.$$eval('#messages .line .text', (els) => els.map((e
   await login(mpage, 'mobileuser');
   const hiddenBefore = await mpage.$eval('#sidebar', (e) => e.getBoundingClientRect().right <= 0);
   await mpage.click('#toggle-sidebar');
-  await mpage.waitForTimeout(300);
+  await mpage.waitForTimeout(900); // the drawer slides in with a spring (0.5 s)
   const shownAfter = await mpage.$eval('#sidebar', (e) => e.getBoundingClientRect().left >= 0);
   if (hiddenBefore && shownAfter) ok('mobile: sidebar off-canvas and toggled'); else fail('mobile sidebar toggle');
   await mpage.keyboard.press('Escape');
   await axe(mpage, 'mobile');
+
+  // v0.2: appearance. A reduced-motion system starts calm; the user's choices
+  // apply at once and survive a reload.
+  const calm = await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true, reducedMotion: 'reduce', colorScheme: 'dark' });
+  const cpage = await calm.newPage();
+  watch(cpage, sink);
+  await cpage.goto(BASE);
+  const attr = (name) => cpage.evaluate((n) => document.documentElement.dataset[n], name);
+  const startMotion = await attr('motion');
+  const startTheme = await attr('theme');
+  await cpage.click('#appearance-btn');
+  await cpage.click('#appearance label:has(input[value=light])');
+  await cpage.click('#appearance label:has(input[value=full])');
+  const afterTheme = await attr('theme');
+  const afterMotion = await attr('motion');
+  await cpage.reload();
+  const keptTheme = await attr('theme');
+  const keptMotion = await attr('motion');
+  if (startMotion === 'reduced' && startTheme === 'dark' && afterTheme === 'light' && afterMotion === 'full' && keptTheme === 'light' && keptMotion === 'full') {
+    ok('appearance: system defaults (dark, reduced motion), choices applied and kept after reload');
+  } else fail(`appearance: ${startTheme}/${startMotion} -> ${afterTheme}/${afterMotion} -> ${keptTheme}/${keptMotion}`);
+  await axe(cpage, 'login (light)');
+  await calm.close();
 
   // Reload: same conversation comes back from the server history.
   await page.reload();
