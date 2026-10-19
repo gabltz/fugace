@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gabltz/fugace/internal/irc"
 )
 
 // Environment variable names.
@@ -34,6 +36,9 @@ const (
 	EnvMaxUploadMB    = "FUGACE_MAX_UPLOAD_MB"
 	EnvFilesMaxMB     = "FUGACE_FILES_MAX_MB"
 	EnvFileTTL        = "FUGACE_FILE_TTL"
+	EnvAdminPassword  = "FUGACE_ADMIN_PASSWORD" //nolint:gosec // variable name, not a credential
+	EnvChannels       = "FUGACE_CHANNELS"
+	EnvHistoryMaxMB   = "FUGACE_HISTORY_MAX_MB"
 )
 
 // Defaults (SPEC §7).
@@ -46,6 +51,8 @@ const (
 	DefaultMaxUploadMB   = 10
 	DefaultFilesMaxMB    = 256
 	DefaultFileTTL       = time.Hour
+	DefaultChannels      = "#general"
+	DefaultHistoryMaxMB  = 64
 )
 
 // Bounds applied during validation.
@@ -55,6 +62,9 @@ const (
 	MaxLabelLen       = 63
 	MaxTrustedProxies = 32
 	MaxPasswordLen    = 128
+	MinAdminPassLen   = 8
+	MaxChannels       = 200
+	MaxHistoryMaxMB   = 4096
 	MaxURLLen         = 2048
 	MaxValueLen       = 4096
 	MinUploadMB       = 1
@@ -95,20 +105,23 @@ func (h Host) String() string {
 
 // Config is the validated runtime configuration.
 type Config struct {
-	Hosts          []Host
-	TLS            TLSMode
-	ACMEDirectory  *url.URL
-	CertCache      string // empty: no disk write at all
-	HTTPAddr       string
-	HTTPSAddr      string
-	IRCAddr        string // empty: disabled
-	IRCSAddr       string // empty: disabled
-	PublicURL      *url.URL
-	Password       string
-	TrustedProxies []netip.Prefix
-	MaxUploadBytes int64
-	FilesMaxBytes  int64
-	FileTTL        time.Duration
+	Hosts           []Host
+	TLS             TLSMode
+	ACMEDirectory   *url.URL
+	CertCache       string // empty: no disk write at all
+	HTTPAddr        string
+	HTTPSAddr       string
+	IRCAddr         string // empty: disabled
+	IRCSAddr        string // empty: disabled
+	PublicURL       *url.URL
+	Password        string
+	TrustedProxies  []netip.Prefix
+	MaxUploadBytes  int64
+	FilesMaxBytes   int64
+	FileTTL         time.Duration
+	AdminPassword   string   // empty: nobody can become admin
+	Channels        []string // created at startup
+	HistoryMaxBytes int64    // 0: channel history disabled
 }
 
 // LookupFunc has the signature of os.LookupEnv.
@@ -119,20 +132,26 @@ type LookupFunc func(key string) (string, bool)
 func Load(lookup LookupFunc) (*Config, error) {
 	p := parser{lookup: lookup}
 	c := &Config{
-		Hosts:          p.hosts(EnvHost),
-		TLS:            p.tlsMode(EnvTLS),
-		ACMEDirectory:  p.httpURL(EnvACMEDirectory, DefaultACMEDirectory, true),
-		CertCache:      p.absPath(EnvCertCache),
-		HTTPAddr:       p.addr(EnvHTTPAddr, DefaultHTTPAddr, false),
-		HTTPSAddr:      p.addr(EnvHTTPSAddr, DefaultHTTPSAddr, false),
-		IRCAddr:        p.addr(EnvIRCAddr, DefaultIRCAddr, true),
-		IRCSAddr:       p.addr(EnvIRCSAddr, DefaultIRCSAddr, true),
-		PublicURL:      p.httpURL(EnvPublicURL, "", false),
-		Password:       p.password(EnvPassword),
-		TrustedProxies: p.prefixes(EnvTrustedProxies),
-		MaxUploadBytes: p.intRange(EnvMaxUploadMB, DefaultMaxUploadMB, MinUploadMB, MaxUploadMB) * bytesPerMB,
-		FilesMaxBytes:  p.intRange(EnvFilesMaxMB, DefaultFilesMaxMB, MinFilesMaxMB, MaxFilesMaxMB) * bytesPerMB,
-		FileTTL:        p.duration(EnvFileTTL, DefaultFileTTL, MinFileTTL, MaxFileTTL),
+		Hosts:           p.hosts(EnvHost),
+		TLS:             p.tlsMode(EnvTLS),
+		ACMEDirectory:   p.httpURL(EnvACMEDirectory, DefaultACMEDirectory, true),
+		CertCache:       p.absPath(EnvCertCache),
+		HTTPAddr:        p.addr(EnvHTTPAddr, DefaultHTTPAddr, false),
+		HTTPSAddr:       p.addr(EnvHTTPSAddr, DefaultHTTPSAddr, false),
+		IRCAddr:         p.addr(EnvIRCAddr, DefaultIRCAddr, true),
+		IRCSAddr:        p.addr(EnvIRCSAddr, DefaultIRCSAddr, true),
+		PublicURL:       p.httpURL(EnvPublicURL, "", false),
+		Password:        p.password(EnvPassword),
+		TrustedProxies:  p.prefixes(EnvTrustedProxies),
+		MaxUploadBytes:  p.intRange(EnvMaxUploadMB, DefaultMaxUploadMB, MinUploadMB, MaxUploadMB) * bytesPerMB,
+		FilesMaxBytes:   p.intRange(EnvFilesMaxMB, DefaultFilesMaxMB, MinFilesMaxMB, MaxFilesMaxMB) * bytesPerMB,
+		FileTTL:         p.duration(EnvFileTTL, DefaultFileTTL, MinFileTTL, MaxFileTTL),
+		AdminPassword:   p.password(EnvAdminPassword),
+		Channels:        p.channels(EnvChannels),
+		HistoryMaxBytes: p.intRange(EnvHistoryMaxMB, DefaultHistoryMaxMB, 0, MaxHistoryMaxMB) * bytesPerMB,
+	}
+	if c.AdminPassword != "" && len(c.AdminPassword) < MinAdminPassLen {
+		p.fail(EnvAdminPassword, fmt.Sprintf("must be at least %d bytes", MinAdminPassLen))
 	}
 	if c.MaxUploadBytes > c.FilesMaxBytes {
 		p.fail(EnvMaxUploadMB, "must not exceed "+EnvFilesMaxMB)
@@ -418,4 +437,29 @@ func (p *parser) duration(name string, def, lo, hi time.Duration) time.Duration 
 		return def
 	}
 	return d
+}
+
+// channels parses a comma-separated list of channel names. An empty value
+// means the default list.
+func (p *parser) channels(name string) []string {
+	v := p.value(name, DefaultChannels)
+	parts := strings.Split(v, ",")
+	if len(parts) > MaxChannels {
+		p.fail(name, fmt.Sprintf("at most %d channels", MaxChannels))
+		return nil
+	}
+	seen := make(map[string]bool, len(parts))
+	out := make([]string, 0, len(parts))
+	for _, raw := range parts {
+		ch := strings.TrimSpace(raw)
+		if !irc.ValidChannel(ch) {
+			p.fail(name, fmt.Sprintf(`entries must start with "#", be printable ASCII without ",", at most %d bytes`, irc.ChannelLen))
+			return nil
+		}
+		if f := irc.Fold(ch); !seen[f] {
+			seen[f] = true
+			out = append(out, ch)
+		}
+	}
+	return out
 }

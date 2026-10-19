@@ -25,6 +25,9 @@ func FuzzLoad(f *testing.F) {
 			EnvFileTTL:        ttl,
 			EnvPassword:       host,
 			EnvCertCache:      addr,
+			EnvChannels:       proxies,
+			EnvHistoryMaxMB:   size,
+			EnvAdminPassword:  public,
 		}))
 		if err != nil {
 			if strings.Contains(err.Error(), "\n\n") {
