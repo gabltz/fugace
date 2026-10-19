@@ -18,11 +18,11 @@
 
 ## 2. Hors périmètre (v1)
 
-- Persistance, historique, scrollback, comptes, NickServ/ChanServ, SASL.
+- Persistance sur disque, historique des messages privés, comptes, NickServ/ChanServ, SASL.
 - Fédération / multi-serveurs / clustering.
 - Chiffrement de bout en bout.
 - DCC (bloqué volontairement, voir §6).
-- Opérateurs de salon, bans, kicks (pas de modération en v1, voir mot de passe optionnel §7).
+- Opérateurs de salon, bans, kicks (seule gestion : un admin crée/supprime les salons et vide leur historique, voir ADR 0003).
 
 ## 3. Interfaces exposées
 
@@ -63,10 +63,10 @@ Les clients qui se connectent par IP n'envoient pas de SNI : le `GetCertificate`
 
 - **Pseudos** : regex `^[A-Za-z\[\]\\`_^{|}][A-Za-z0-9\[\]\\`_^{|}-]{0,29}$`, insensible à la casse (CASEMAPPING=ascii). Espace de noms unique web + IRC. Collision → `433 ERR_NICKNAMEINUSE`.
 - **Hostmask** : `nick!~user@fugace` (TCP) / `nick!web@fugace` (web). L'IP n'apparaît **jamais**, ni dans les masques, ni dans WHOIS, ni dans WHO.
-- **Salons** : préfixe `#`, longueur max 32, créés au premier JOIN, détruits quand vides. Topic modifiable par tout membre. Pas d'opérateurs (`PREFIX=()`).
+- **Salons** : préfixe `#`, longueur max 32, ASCII imprimable. Créés uniquement par l'admin (en les rejoignant) ou au démarrage (`FUGACE_CHANNELS`), persistants même vides. Topic modifiable par tout membre. L'admin (`OPER`) apparaît `@` partout (`PREFIX=(o)@`) ; aucun autre opérateur.
 - **Salon par défaut** : `#general`, rejoint automatiquement par les clients web.
 - **Messages privés** : `PRIVMSG nick :...` supportés.
-- **Historique** : aucun. Un arrivant ne voit que ce qui est dit après son arrivée.
+- **Historique** : chaque salon garde en RAM tous ses messages depuis le démarrage (budget `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien), rejoués à chaque JOIN. Rien pour les messages privés. L'admin peut vider l'historique (`CLEARHISTORY`) ou supprimer le salon (`DELCHAN`).
 
 ## 5. Compatibilité IRC (RFC 1459 / 2812, sous-ensemble + IRCv3 léger)
 
@@ -85,11 +85,13 @@ Les clients qui se connectent par IP n'envoient pas de SNI : le `GetCertificate`
 | `WHO`, `WHOIS` | Réponses minimales, aucune IP, aucun idle time précis (arrondi ou omis) |
 | `MODE` | Réponses inertes cohérentes (`324`, `221`) pour ne pas casser les clients ; aucun mode modifiable |
 | `MOTD`, `LUSERS`, `VERSION`, `TIME` | Réponses minimales |
+| `OPER` | Authentification admin par `FUGACE_ADMIN_PASSWORD` |
+| `DELCHAN`, `CLEARHISTORY` | Admin uniquement : supprimer un salon, vider son historique |
 | Inconnue | `421 ERR_UNKNOWNCOMMAND` |
 
 ### 5.2 ISUPPORT (005) minimal
 
-`NETWORK=fugace CASEMAPPING=ascii CHANTYPES=# CHANLIMIT=#:20 CHANNELLEN=32 NICKLEN=30 TOPICLEN=300 PREFIX=() MAXTARGETS=4`
+`NETWORK=fugace CASEMAPPING=ascii CHANTYPES=# CHANLIMIT=#:20 CHANNELLEN=32 NICKLEN=30 TOPICLEN=300 PREFIX=(o)@ MAXTARGETS=4`
 plus le jeton vendeur d'upload (§6.2).
 
 ### 5.3 Limites protocolaires
@@ -151,6 +153,9 @@ Tout fonctionne sans aucune variable. Surcharges possibles :
 | `FUGACE_MAX_UPLOAD_MB` | `10` | Taille max par fichier |
 | `FUGACE_FILES_MAX_MB` | `256` | Budget RAM fichiers |
 | `FUGACE_FILE_TTL` | `1h` | Durée de vie d'un fichier |
+| `FUGACE_ADMIN_PASSWORD` | vide | Mot de passe admin (`OPER`, champ web). Vide = pas d'admin |
+| `FUGACE_CHANNELS` | `#general` | Salons créés au démarrage, séparés par des virgules |
+| `FUGACE_HISTORY_MAX_MB` | `64` | Budget RAM de l'historique des salons, `0` = désactivé |
 
 Validation stricte au démarrage : valeur invalide → message d'erreur clair et sortie code 2.
 

@@ -39,12 +39,14 @@
 | T16 | A5 récupère la clé privée TLS | Clé en RAM uniquement (cache opt-in en 0600) | `docker diff` vide sans cache |
 | T17 | Quotas Let's Encrypt épuisés (recréations répétées) → service indisponible | Repli autosigné immédiat, backoff, cache opt-in, statut consultable | Test avec directory ACME simulé (pebble) renvoyant `rateLimited` |
 | T18 | A1 abuse du handler `http-01` | Ne répond qu'aux jetons en cours, réponse de taille fixe | Test unitaire |
+| T19 | A2 crée/supprime des salons ou vide l'historique sans être admin, ou devine le mot de passe admin | Commandes réservées à `OPER`, comparaison temps constant, déconnexion après 5 échecs | Tests unitaires OPER/DELCHAN/CLEARHISTORY |
+| T20 | A2 épuise la RAM via l'historique | Budget global `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien, rate-limit des messages | Test unitaire du budget |
 
 ## Limites assumées (à écrire dans le README)
 
 - « No-log » côté serveur ne contrôle pas les clients : la plupart des clients IRC journalisent localement par défaut.
 - Le port 6667 est en clair.
-- Tant que le conteneur tourne, la RAM contient les fichiers de l'heure écoulée ; un root sur l'hôte peut la lire.
+- Tant que le conteneur tourne, la RAM contient les fichiers de l'heure écoulée et l'historique des salons depuis le démarrage ; un root sur l'hôte peut la lire.
 - Aucun reverse proxy n'est nécessaire. Si on en met un quand même (`FUGACE_TLS=off`), il doit avoir `access_log off`, sinon les IP et URLs de fichiers y sont journalisées.
 - Sans `FUGACE_HOST`, le certificat est autosigné : avertissement navigateur, et un attaquant en position de MITM pourrait s'interposer si l'utilisateur accepte aveuglément l'avertissement.
 - Les certificats émis apparaissent dans les journaux Certificate Transparency publics (le domaine ou l'IP est donc publiquement associé à un service TLS).
