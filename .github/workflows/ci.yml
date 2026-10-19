@@ -97,8 +97,10 @@ jobs:
           echo "image size: $size bytes"
           test "$size" -lt 20971520
       - name: Smoke test
-        # set SMOKE_IRC=1 from M1, SMOKE_TLS=1 from M3
-        run: SMOKE_IRC=0 SMOKE_TLS=0 ./scripts/smoke.sh fugace:ci
+        # set SMOKE_TLS=1 from M3
+        run: SMOKE_IRC=1 SMOKE_TLS=0 ./scripts/smoke.sh fugace:ci
+      - name: Real IRC clients (WeeChat, irssi)
+        run: ./scripts/clients/run.sh fugace:ci all
       - name: Trivy scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
