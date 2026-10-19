@@ -90,6 +90,16 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [ ] Tag `v0.2.0`
 - **Acceptation** : toute la suite navigateur, les clients IRC et le smoke passent ; budget ≤ 128 Ko ; aucune violation CSP ni erreur console ; axe sans violation en clair, en sombre et sur mobile.
 
+## M8 — Distribution publique
+
+- [x] Licence AGPL-3.0 (`LICENSE`), notices tierces
+- [x] README public en anglais : bannière, badges (CI, release, Go, Go Report Card, licence, image, plateformes, signature, statistiques), captures, démarrage, configuration, sécurité, vérification, développement
+- [x] `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, modèles d'issues et de PR, CHANGELOG en anglais
+- [x] Docs de conception relues pour publication (index `docs/README.md`, arborescence et dépendances réelles)
+- [x] Historique Git vérifié : aucun secret ni fichier sensible
+- [ ] Dépôt et paquet GHCR rendus publics, protections et fonctions de sécurité GitHub activées
+- **Acceptation** : un visiteur comprend, installe et vérifie fugace depuis le seul README ; CI verte.
+
 ## Backlog (post v0.1)
 
 - Rendu des codes de formatage IRC (gras/italique/couleurs)

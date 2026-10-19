@@ -1,71 +1,64 @@
 # Changelog
 
-Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
+All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.2.0] - non publiée
+## [0.2.0] - Unreleased
 
-Refonte de l'interface web ; le serveur et le protocole sont inchangés.
+A redesign of the web client. The server and the protocol are unchanged.
 
-### Ajouté
-- **Thèmes et surfaces** :
-  - thèmes « Aurora » sombre et verre givré clair, suivant le système, avec réglage Auto/Clair/Sombre ;
-  - interface en verre dépoli, fond animé, halo qui suit le pointeur, bordures animées ;
-  - police Inter embarquée (servie depuis le serveur, aucun CDN).
-- **Conversation** : messages groupés par auteur avec avatars, séparateurs de jour, bouton « Nouveaux messages ».
-- **Animations** :
-  - arrivée des messages en ressort, transitions entre conversations, indicateur de salon coulissant ;
-  - boutons magnétiques et ondulations, visionneuse d'images, particules à l'envoi d'un fichier ;
-  - réglage Auto/Pleines/Réduites, où Auto respecte le choix « réduire les animations » du système.
+### Added
+- **Themes**: a dark "aurora" theme and a light frosted-glass theme. They follow the system, with an Auto/Light/Dark setting applied before the first paint.
+- **Look and feel**:
+  - glass panels, an animated background, a halo that follows the pointer, animated borders;
+  - messages grouped by author with avatars, day separators and a "new messages" button;
+  - spring-animated arrivals, view transitions between conversations, a sliding channel indicator;
+  - magnetic buttons and ripples, an image lightbox, particles when a file is sent.
+- **Motion setting**: Auto/Full/Reduced. Auto honours the system "reduce motion" preference.
+- **Font**: the Inter typeface, embedded and served by fugace itself (no CDN).
+- **Project**: AGPL-3.0 license, contribution guide, code of conduct, issue and pull request templates, English README.
 
-### Modifié
-- CSP : ajout de `font-src 'self'` pour la police embarquée.
-- Budget du client web : 128 Ko police comprise (au lieu de 60 Ko sans police).
+### Changed
+- CSP: adds `font-src 'self'` for the embedded font.
+- The web client budget is now 128 KB including the font (it was 60 KB without a font).
 
-### Corrigé
-- Avec les transitions animées, un message ou un fichier envoyé juste après un changement de conversation pouvait partir dans la précédente.
+### Fixed
+- With animated transitions, a message or file sent right after switching conversations could go to the previous one.
+- Your own messages now always scroll the conversation to the bottom. A preview that finishes loading no longer leaves the view above the latest messages.
 
 ## [0.1.0] - 2026-10-19
 
-Première version.
+First release.
 
-### Ajouté
-- **Serveur IRC** :
-  - enregistrement (`CAP` 302 avec `echo-message`, `server-time`, `message-tags`) ;
-  - salons, messages privés, `WHO`/`WHOIS` sans aucune IP ni temps d'inactivité, `MODE` inertes ;
-  - DCC bloqué ;
-  - anti-flood par ralentissement, files d'envoi bornées, délais d'enregistrement (30 s) et de PING (180 s).
-- **Historique** de salon en RAM depuis le démarrage (budget global, rejeu au JOIN avec l'heure d'origine) et **administration** des salons par `OPER` : création, `DELCHAN`, `CLEARHISTORY` (ADR 0003).
-- **Client web** vanilla (36 Ko, sans build ni dépendance) via IRC sur WebSocket (`text.ircv3.net`) :
-  - salons, MP, membres, commandes, reconnexion ;
-  - thème clair/sombre, mobile ;
-  - CSP stricte sans inline ; accessibilité vérifiée par axe-core.
-- **HTTPS intégré** sans reverse proxy :
-  - priorité certificat monté > Let's Encrypt pour les domaines de `FUGACE_HOST` > autosigné en RAM ;
-  - accès par IP : autosigné (réseau local, ADR 0007) ;
-  - même certificat pour IRC TLS (6697) ;
-  - HTTP redirige vers HTTPS ;
-  - HSTS seulement avec un certificat de confiance sur un domaine ;
-  - repli et backoff ≥ 1 h en cas d'échec ACME, cache opt-in ;
-  - `fugace status` pour consulter l'état.
-- **Fichiers et images** en RAM (10 Mo, 256 Mo au total, 1 h) :
-  - ré-encodage JPEG/PNG/GIF animé/WebP, qui supprime EXIF et GPS en conservant l'orientation ;
-  - bombes de décompression refusées avant décodage ;
-  - tout le reste servi en téléchargement ;
-  - envoi lié à une connexion vivante (jeton `fugace/UPLOAD` dans le `005`).
-- **Durcissement** :
-  - `FUGACE_PASSWORD`, `FUGACE_TRUSTED_PROXIES` ;
-  - limites de connexions par source hachée (IRC/WS et HTTP) ;
-  - aucune écriture disque, aucune sortie hors ligne de démarrage.
-- **Conteneur** :
-  - image `scratch` d'environ 13 Mo, multi-arch amd64/arm64 ;
-  - non-root, rootfs en lecture seule, aucune capability ;
-  - SBOM, provenance, signature cosign sans clé.
-- **Vérifications** :
-  - fuzzing des parseurs (lignes IRC, configuration, images, noms de fichiers, `X-Forwarded-For`) ;
-  - clients WeeChat et irssi réels ;
-  - Chromium headless (XSS, CSP, axe) ;
-  - ACME contre pebble ;
-  - charge, flood et slowloris (`docs/BENCH.md`).
+### Added
+- **IRC server**:
+  - registration with IRCv3 `CAP` 302 (`echo-message`, `server-time`, `message-tags`);
+  - channels and private messages;
+  - `WHO`/`WHOIS` without any IP address or idle time, inert `MODE` replies, DCC blocked;
+  - fake-lag flood control, bounded send queues, registration (30 s) and ping (180 s) timeouts.
+- **Channel history** kept in RAM since startup (global budget, replayed on join with the original timestamps) and **channel administration** through `OPER`: create channels, `DELCHAN`, `CLEARHISTORY`.
+- **Web client** in vanilla JS over IRC-over-WebSocket (`text.ircv3.net`):
+  - channels, private messages, members, commands, reconnection;
+  - strict CSP without inline code, accessibility checked with axe-core.
+- **Built-in HTTPS** without a reverse proxy:
+  - mounted certificate > Let's Encrypt for the domains in `FUGACE_HOST` > self-signed in RAM, the same certificate for IRC over TLS;
+  - HTTP redirects to HTTPS; HSTS only with a trusted certificate on a domain;
+  - self-signed fallback and a ≥ 1 h back-off on ACME failures, opt-in cache;
+  - `fugace status` to check the state.
+- **Files and images** in RAM (10 MB each, 256 MB in total, 1 hour):
+  - JPEG/PNG/animated GIF/WebP re-encoded, which strips EXIF and GPS while keeping orientation;
+  - decompression bombs refused before decoding, other files served as downloads;
+  - uploads bound to a live connection (`fugace/UPLOAD` token in `005`).
+- **Hardening**:
+  - `FUGACE_PASSWORD`, `FUGACE_TRUSTED_PROXIES`;
+  - per-source connection limits (IRC/WS and HTTP);
+  - no disk writes, no output besides the startup line.
+- **Container**: `scratch` image of about 13 MB, multi-arch amd64/arm64, non-root, read-only rootfs, no capabilities, SBOM, provenance and keyless cosign signature.
+- **Verification**:
+  - fuzzing of every parser;
+  - real WeeChat and irssi clients;
+  - headless Chromium (XSS, CSP, axe);
+  - ACME against pebble;
+  - load, flood and slowloris runs.
 
 [0.2.0]: https://github.com/gabltz/fugace/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gabltz/fugace/releases/tag/v0.1.0
