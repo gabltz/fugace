@@ -43,15 +43,14 @@ Les ports internes sont > 1024 : le processus tourne sans root et sans aucune ca
 ### 3.1 Certificat TLS (ordre de priorité)
 
 1. **Certificat monté** : `/certs/tls.crt` + `/certs/tls.key` présents → utilisés tels quels (rechargés si modifiés).
-2. **ACME automatique** : si `FUGACE_HOST` est défini (domaine(s) et/ou IP publique(s), séparés par des virgules) → certificat Let's Encrypt obtenu au démarrage, en RAM.
-   - Domaine : profil par défaut (ou `shortlived`).
-   - **IP** : profil `shortlived` obligatoire (certificat de 160 h), challenges `http-01` ou `tls-alpn-01` uniquement (pas de DNS-01 pour une IP).
-   - Renouvellement automatique tant que le conteneur tourne (ARI si disponible, sinon à mi-vie).
+2. **ACME automatique** : si `FUGACE_HOST` contient un ou plusieurs **noms de domaine** → certificat Let's Encrypt obtenu au démarrage, en RAM (ADR 0007).
+   - Domaines uniquement : aucune émission pour une adresse IP (accès par IP = réseau local, autosigné).
+   - Renouvellement automatique à mi-vie tant que le conteneur tourne.
    - Compte ACME éphémère (clé générée en RAM), sans e-mail.
-   - Seuls les identifiants listés dans `FUGACE_HOST` peuvent déclencher une émission : jamais d'émission à la demande d'après un en-tête `Host` ou un SNI.
-3. **Autosigné** : sinon, ou si l'ACME échoue → certificat autosigné généré en RAM (SAN : `localhost`, `127.0.0.1`, identifiants de `FUGACE_HOST` s'il y en a). Le navigateur affichera un avertissement. En cas d'échec ACME, nouvelle tentative avec backoff (≥ 1 h, respect du `Retry-After`), sans boucle qui épuiserait les quotas.
+   - Seuls les domaines listés dans `FUGACE_HOST` peuvent déclencher une émission : jamais d'émission à la demande d'après un en-tête `Host` ou un SNI.
+3. **Autosigné** : sinon, ou si l'ACME échoue → certificat autosigné généré en RAM (SAN : `localhost`, `127.0.0.1`, `::1`, identifiants de `FUGACE_HOST` s'il y en a). Le navigateur affichera un avertissement. En cas d'échec ACME, nouvelle tentative avec backoff (≥ 1 h, respect du `Retry-After`), sans boucle qui épuiserait les quotas.
 
-Contraintes à documenter : pour l'ACME, les ports 80 et 443 de l'hôte doivent être joignables depuis Internet (redirections NAT si derrière une box) et `FUGACE_HOST` doit être l'IP **publique**. Let's Encrypt limite à 5 certificats par ensemble d'identifiants et par semaine : chaque recréation du conteneur consomme une émission, d'où le repli autosigné et le cache optionnel (§7).
+Contraintes à documenter : pour l'ACME, le domaine doit pointer vers l'hôte et les ports 80 et 443 de l'hôte doivent être joignables depuis Internet (redirections NAT si derrière une box). Let's Encrypt limite à 5 certificats par ensemble d'identifiants et par semaine : chaque recréation du conteneur consomme une émission, d'où le repli autosigné et le cache optionnel (§7).
 
 Les clients qui se connectent par IP n'envoient pas de SNI : le `GetCertificate` doit renvoyer le certificat par défaut quand le SNI est vide.
 
@@ -139,7 +138,7 @@ Tout fonctionne sans aucune variable. Surcharges possibles :
 
 | Variable | Défaut | Rôle |
 |----------|--------|------|
-| `FUGACE_HOST` | vide | Domaine(s)/IP publique(s) pour le certificat Let's Encrypt et les URLs. Vide = autosigné |
+| `FUGACE_HOST` | vide | Domaine(s) pour le certificat Let's Encrypt, IP ajoutées au certificat autosigné, base des URLs. Vide = autosigné |
 | `FUGACE_TLS` | `auto` | `auto` (monté > ACME > autosigné) ou `off` (derrière un proxy) |
 | `FUGACE_ACME_DIRECTORY` | Let's Encrypt prod | URL du directory ACME (staging pour les tests) |
 | `FUGACE_CERT_CACHE` | vide | Chemin d'un volume pour garder compte + certificat ACME entre recréations. Seule écriture disque autorisée, et seulement si défini. Ne contient aucune donnée utilisateur |
