@@ -43,6 +43,8 @@ func contentType(name string) (string, bool) {
 		return "text/javascript; charset=utf-8", true
 	case ".svg":
 		return "image/svg+xml", true
+	case ".woff2":
+		return "font/woff2", true
 	default:
 		return "", false
 	}
@@ -89,15 +91,37 @@ func NewStatic(fsys fs.FS, dir string) (*Static, error) {
 	if indexBody == nil {
 		return nil, errors.New("web: index.html missing")
 	}
-	html := string(indexBody)
+	// Stylesheets reference fonts and images: version those URLs first, so
+	// that they can be cached as immutable too, then version the index.
 	for name, a := range s.files {
-		ref := `"` + staticPrefix + name + `"`
-		html = strings.ReplaceAll(html, ref, `"`+staticPrefix+name+"?v="+a.version+`"`)
+		if path.Ext(name) != ".css" {
+			continue
+		}
+		css := versionRefs(string(a.body), s.files, func(n string) bool { return path.Ext(n) != ".css" })
+		if s.files[name], err = newAsset(name, []byte(css)); err != nil {
+			return nil, err
+		}
 	}
+	html := versionRefs(string(indexBody), s.files, func(string) bool { return true })
 	if s.index, err = newAsset(indexName, []byte(html)); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// versionRefs rewrites "/static/<name>" references (quoted or in url())
+// to "/static/<name>?v=<version>" for the selected assets.
+func versionRefs(text string, files map[string]*asset, pick func(string) bool) string {
+	for name, a := range files {
+		if !pick(name) {
+			continue
+		}
+		ref := staticPrefix + name
+		for _, q := range []string{`"`, `)`} {
+			text = strings.ReplaceAll(text, ref+q, ref+"?v="+a.version+q)
+		}
+	}
+	return text
 }
 
 // Size returns the total size of the client in bytes.

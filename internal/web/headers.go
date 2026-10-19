@@ -4,7 +4,7 @@ import "net/http"
 
 // ContentSecurityPolicy is the policy for every page of the web client.
 const ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; " +
-	"img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	"img-src 'self' blob:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 // securityHeaders returns the headers set on every response (ARCHITECTURE §7).
 // A function returning an array value keeps the table immutable.

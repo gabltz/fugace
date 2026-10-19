@@ -16,12 +16,15 @@
   const UPLOAD_TOKEN = 'fugace/UPLOAD=';
   // Only our own re-encoded images get an inline preview (anti-tracking).
   const PREVIEW_RE = /^\/f\/[A-Za-z0-9_-]{22}\/[^/]+\.(jpg|png|gif)$/;
+  const LIVE_MS = 5000; // lines younger than this are animated
+  const GROUP_MS = 5 * 60 * 1000; // consecutive lines of one author group together
+  const SPARKS = 18;
 
   const st = {
     ws: null, nick: '', wantNick: '', serverPass: '', adminPass: '',
     registered: false, everRegistered: false, admin: false, closing: false,
     retry: 0, timer: null, buffers: new Map(), active: SERVER,
-    channels: new Set(['#general']), focusNext: '#general', uploadToken: '',
+    channels: new Set(['#general']), focusNext: '#general', uploadToken: '', shownMembers: new Map(),
   };
 
   const fold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -115,14 +118,22 @@
   function add(b, kind, text, opts = {}) {
     const l = { kind, text, nick: opts.nick || '', at: opts.at || new Date() };
     if (opts.nick && st.nick && fold(opts.nick) !== fold(st.nick) && mentions(text)) l.kind += ' mention';
+    if (opts.nick && st.nick && fold(opts.nick) === fold(st.nick)) l.mine = true;
+    const prev = b.lines[b.lines.length - 1];
     b.lines.push(l);
     if (b.lines.length > MAX_LINES) b.lines.shift();
     if (b.key === st.active) {
       const list = $('messages');
-      const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
-      list.append(renderLine(l));
+      const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+      // Only live lines animate: a replayed history appears at once.
+      const live = Date.now() - l.at.getTime() < LIVE_MS;
+      for (const node of renderLine(l, prev)) {
+        if (live && node.classList.contains('line')) node.classList.add('enter');
+        list.append(node);
+      }
       while (list.childElementCount > MAX_LINES) list.firstElementChild.remove();
       if (atBottom) list.scrollTop = list.scrollHeight;
+      else if (live && opts.nick) $('jump').hidden = false;
     } else if (opts.nick && (kind === 'msg' || kind === 'action')) {
       b.unread++;
       renderBuffers();
@@ -149,10 +160,17 @@
     return e;
   }
 
-  function nickClass(nick) {
+  function hue(nick) {
     let h = 0;
     for (const c of fold(nick)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-    return 'nick n' + (h % 8);
+    return h % 8;
+  }
+  const nickClass = (nick) => 'nick n' + hue(nick);
+
+  function avatar(nick, small) {
+    const a = el('span', 'avatar a' + hue(nick) + (small ? ' sm' : ''), (nick.match(/[A-Za-z0-9]/) || [nick[0] || '?'])[0]);
+    a.setAttribute('aria-hidden', 'true');
+    return a;
   }
 
   function formatTime(d) {
@@ -199,30 +217,72 @@
     return a;
   }
 
-  function renderLine(l) {
-    const li = el('li', 'line ' + l.kind);
+  const isTalk = (l) => l.nick && /^(msg|action|notice)/.test(l.kind);
+
+  function dayLabel(d) {
+    const today = new Date();
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Aujourd’hui';
+    if (d.toDateString() === yesterday.toDateString()) return 'Hier';
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  // renderLine returns the nodes for l: an optional day separator, then the
+  // line. Consecutive lines of one author are grouped (no repeated header).
+  function renderLine(l, prev) {
+    const nodes = [];
+    if (!prev || prev.at.toDateString() !== l.at.toDateString()) nodes.push(el('li', 'day', dayLabel(l.at)));
+    const grouped = prev && isTalk(l) && isTalk(prev) && fold(prev.nick) === fold(l.nick) &&
+      prev.at.toDateString() === l.at.toDateString() && l.at - prev.at < GROUP_MS && prev.kind.split(' ')[0] === l.kind.split(' ')[0];
+    const talk = isTalk(l);
+    const li = el('li', 'line ' + l.kind + (talk ? (grouped ? ' cont' : ' first') : '') + (l.mine ? ' mine' : ''));
     const t = el('time', '', formatTime(l.at));
     t.dateTime = l.at.toISOString();
-    li.append(t);
     const text = el('span', 'text');
-    if (l.kind.startsWith('action')) {
-      text.append('* ', l.nick, ' ');
-    } else if (l.nick) {
-      li.append(el('span', nickClass(l.nick), l.kind.startsWith('notice') ? '-' + l.nick + '-' : l.nick));
-    }
+    if (l.kind.startsWith('action')) text.append(l.nick, ' ');
     linkify(text, l.text);
-    li.append(text);
-    return li;
+    if (talk && !grouped) {
+      li.append(avatar(l.nick));
+      const meta = el('div', 'meta');
+      meta.append(el('span', nickClass(l.nick), l.kind.startsWith('notice') ? '-' + l.nick + '-' : l.nick), t);
+      li.append(meta, text);
+    } else if (talk) {
+      li.append(t, text);
+    } else {
+      li.append(text, t);
+    }
+    nodes.push(li);
+    return nodes;
+  }
+
+  function renderLines(lines) {
+    const out = [];
+    lines.forEach((l, i) => out.push(...renderLine(l, lines[i - 1])));
+    return out;
   }
 
   function setActive(b) {
+    const switching = st.active !== b.key;
+    // State first, synchronously: what is typed or dropped right after a
+    // click must go to the new conversation. Only the rendering is deferred.
     st.active = b.key;
     b.unread = 0;
+    if (switching && motion() && document.startViewTransition && !$('app').hidden) {
+      document.startViewTransition(() => showBuffer(b));
+      return;
+    }
+    showBuffer(b);
+  }
+
+  function showBuffer(b) {
+    st.active = b.key;
+    b.unread = 0;
+    $('jump').hidden = true;
     $('buffer-name').textContent = b.type === 'server' ? 'fugace' : b.name;
     $('topic').textContent = b.topic;
     $('topic').title = b.topic;
     const list = $('messages');
-    list.replaceChildren(...b.lines.map(renderLine));
+    list.replaceChildren(...renderLines(b.lines));
     list.scrollTop = list.scrollHeight;
     $('members-panel').hidden = b.type !== 'channel';
     renderBuffers();
@@ -237,8 +297,15 @@
       for (const b of sorted) {
         const btn = el('button', '');
         btn.type = 'button';
-        btn.append(el('span', '', b.name));
-        if (b.unread) btn.append(el('span', 'unread', String(b.unread)));
+        if (type === 'channel') btn.append(el('span', 'hash', '#'));
+        else btn.append(avatar(b.name, true));
+        btn.append(el('span', 'name', type === 'channel' ? b.name.slice(1) : b.name));
+        if (b.unread) {
+          const badge = el('span', 'unread', String(b.unread));
+          if (b.unread > (b.shown || 0)) badge.classList.add('bump');
+          btn.append(badge);
+        }
+        b.shown = b.unread;
         btn.setAttribute('aria-current', String(b.key === st.active));
         btn.addEventListener('click', () => { setActive(b); $('input').focus(); });
         const li = el('li');
@@ -247,13 +314,35 @@
       }
       $(id).replaceChildren(...items);
     }
+    moveIndicator();
+  }
+
+  // The active conversation is marked by one pill sliding between items.
+  function moveIndicator() {
+    const ind = $('indicator');
+    const btn = document.querySelector('.buffers button[aria-current=true]');
+    if (!btn) { ind.classList.remove('on'); return; }
+    const wrap = $('buffers-wrap').getBoundingClientRect();
+    const r = btn.getBoundingClientRect();
+    ind.style.setProperty('--y', (r.top - wrap.top) + 'px');
+    ind.style.setProperty('--h', r.height + 'px');
+    ind.classList.add('on');
   }
 
   function renderMembers() {
     const b = st.buffers.get(st.active);
     if (!b || b.type !== 'channel') return;
     const ms = [...b.members.values()].sort((x, y) => (y.prefix ? 1 : 0) - (x.prefix ? 1 : 0) || fold(x.nick).localeCompare(fold(y.nick)));
-    $('members').replaceChildren(...ms.map((m) => el('li', nickClass(m.nick), m.prefix + m.nick)));
+    const seen = st.shownMembers.get(b.key) || new Set();
+    let fresh = 0;
+    $('members').replaceChildren(...ms.map((m) => {
+      const li = el('li');
+      li.append(avatar(m.nick, true), el('span', 'who ' + nickClass(m.nick), m.nick));
+      if (m.prefix) li.append(el('span', 'crown', '★ admin'));
+      if (!seen.has(fold(m.nick))) { li.classList.add('enter'); li.style.setProperty('--i', String(Math.min(fresh++, 20))); }
+      return li;
+    }));
+    st.shownMembers.set(b.key, new Set(ms.map((m) => fold(m.nick))));
     $('member-count').textContent = '(' + ms.length + ')';
   }
 
@@ -265,9 +354,12 @@
     btn.setAttribute('aria-expanded', String(on));
   }
 
-  function status(text) {
+  function status(text, waiting) {
     $('status').textContent = text || '';
     $('status').hidden = !text;
+    const conn = $('conn');
+    conn.classList.toggle('wait', Boolean(waiting));
+    conn.setAttribute('aria-label', waiting ? 'Reconnexion…' : 'Connecté');
   }
 
   // --- connection -------------------------------------------------------
@@ -300,7 +392,7 @@
       if (!st.everRegistered) { showLogin(st.loginError || 'Connexion impossible.'); return; }
       const delay = BACKOFF[Math.min(st.retry, BACKOFF.length - 1)] * (0.8 + Math.random() * 0.4);
       st.retry++;
-      status('Connexion perdue. Nouvelle tentative dans ' + Math.round(delay) + ' s…');
+      status('Connexion perdue. Nouvelle tentative dans ' + Math.round(delay) + ' s…', true);
       st.timer = setTimeout(connect, delay * 1000);
     });
   }
@@ -313,6 +405,7 @@
     st.loginError = '';
     status('');
     $('me-nick').textContent = nick;
+    $('me-avatar').replaceWith(Object.assign(avatar(nick), { id: 'me-avatar' }));
     $('login').hidden = true;
     $('app').hidden = false;
     if (st.adminPass) send('OPER admin :' + st.adminPass);
@@ -458,6 +551,7 @@
       st.nick = to;
       st.wantNick = to;
       $('me-nick').textContent = to;
+      $('me-avatar').replaceWith(Object.assign(avatar(to), { id: 'me-avatar' }));
     }
     for (const b of st.buffers.values()) {
       const mem = b.members.get(fold(from));
@@ -602,6 +696,10 @@
     const b = activeTarget();
     if (!b) return info('Choisissez un salon pour écrire.', 'error');
     say(b.name, text.startsWith('//') ? text.slice(1) : text);
+    const send = $('send');
+    send.classList.remove('ready', 'go');
+    void send.offsetWidth; // restart the animation
+    send.classList.add('go');
   }
 
   // --- uploads ----------------------------------------------------------
@@ -622,7 +720,7 @@
       if (xhr.status === 201) {
         try {
           const reply = JSON.parse(xhr.responseText);
-          if (typeof reply.url === 'string') say(b.name, reply.url);
+          if (typeof reply.url === 'string') { say(b.name, reply.url); burst($('attach')); }
         } catch { info('Réponse d’envoi illisible.', 'error'); }
         return;
       }
@@ -652,6 +750,112 @@
       e.preventDefault();
       for (const f of files) upload(f);
     });
+  }
+
+  // --- effects ----------------------------------------------------------
+  const motion = () => document.documentElement.dataset.motion === 'full';
+  const finePointer = matchMedia('(pointer: fine)');
+
+  function setupEffects() {
+    // Ripple from the pointer on every button.
+    document.addEventListener('pointerdown', (e) => {
+      const btn = e.target.closest('.btn, .buffers button');
+      if (!btn || !motion()) return;
+      const r = btn.getBoundingClientRect();
+      const dot = el('span', 'ripple');
+      dot.style.setProperty('--rx', (e.clientX - r.left) + 'px');
+      dot.style.setProperty('--ry', (e.clientY - r.top) + 'px');
+      dot.style.setProperty('--rs', Math.max(r.width, r.height) * 2.2 + 'px');
+      dot.addEventListener('animationend', () => dot.remove());
+      btn.append(dot);
+    });
+    // Magnetic primary buttons and a spotlight that follows the cursor.
+    let frame = 0;
+    document.addEventListener('pointermove', (e) => {
+      if (!motion() || !finePointer.matches || frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const root = document.documentElement;
+        root.style.setProperty('--mx', e.clientX + 'px');
+        root.style.setProperty('--my', e.clientY + 'px');
+        document.querySelector('.spotlight').classList.add('on');
+        for (const m of document.querySelectorAll('.magnetic')) {
+          const r = m.getBoundingClientRect();
+          const dx = e.clientX - (r.left + r.width / 2);
+          const dy = e.clientY - (r.top + r.height / 2);
+          const near = Math.hypot(dx, dy) < Math.max(r.width, r.height);
+          m.style.setProperty('--tx', near ? dx * 0.18 + 'px' : '0px');
+          m.style.setProperty('--ty', near ? dy * 0.18 + 'px' : '0px');
+        }
+      });
+    });
+    document.addEventListener('pointerleave', () => document.querySelector('.spotlight').classList.remove('on'));
+    // The send button wakes up when there is something to send.
+    $('input').addEventListener('input', () => {
+      const ready = $('input').value.trim() !== '';
+      if (ready !== $('send').classList.contains('ready')) $('send').classList.toggle('ready', ready);
+    });
+    // Keep the active pill aligned on resize.
+    addEventListener('resize', moveIndicator);
+    $('messages').addEventListener('scroll', () => {
+      const list = $('messages');
+      if (list.scrollHeight - list.scrollTop - list.clientHeight < 80) $('jump').hidden = true;
+    });
+    $('jump').addEventListener('click', () => {
+      const list = $('messages');
+      list.scrollTop = list.scrollHeight;
+      $('jump').hidden = true;
+    });
+  }
+
+  // A small burst of particles from an element (full motion only).
+  function burst(from) {
+    if (!motion() || !from.animate) return;
+    const r = from.getBoundingClientRect();
+    for (let i = 0; i < SPARKS; i++) {
+      const s = el('span', 'spark s' + (i % 4));
+      s.style.setProperty('--x', r.left + r.width / 2 + 'px');
+      s.style.setProperty('--y', r.top + r.height / 2 + 'px');
+      $('fx').append(s);
+      const angle = (Math.PI * 2 * i) / SPARKS + Math.random() * 0.5;
+      const dist = 50 + Math.random() * 70;
+      s.animate([
+        { transform: 'translate(-50%, -50%) scale(1) rotate(0deg)', opacity: 1 },
+        { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist - 30}px) scale(0) rotate(${200 + Math.random() * 300}deg)`, opacity: 0 },
+      ], { duration: 650 + Math.random() * 450, easing: 'cubic-bezier(.2,.7,.2,1)' }).finished.then(() => s.remove());
+    }
+  }
+
+  function setupAppearance() {
+    const prefs = window.fugacePrefs;
+    if (!prefs) return;
+    for (const kind of ['theme', 'motion']) {
+      for (const input of document.querySelectorAll('input[name=' + kind + ']')) {
+        input.checked = input.value === prefs.get(kind);
+        input.addEventListener('change', () => {
+          if (!input.checked) return;
+          const change = () => prefs.set(kind, input.value);
+          // Theme changes cross-fade when motion is on.
+          if (kind === 'theme' && motion() && document.startViewTransition) document.startViewTransition(change);
+          else change();
+        });
+      }
+    }
+  }
+
+  // Same-origin image previews open in a lightbox; modified clicks keep
+  // their usual behaviour (new tab).
+  function setupLightbox() {
+    const box = $('lightbox');
+    $('messages').addEventListener('click', (e) => {
+      const img = e.target.closest('img.preview');
+      if (!img || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || !box.showModal) return;
+      e.preventDefault();
+      $('lightbox-img').src = img.getAttribute('src');
+      $('lightbox-img').alt = img.alt;
+      box.showModal();
+    });
+    box.addEventListener('click', (e) => { if (e.target === box) box.close(); });
   }
 
   // --- login ------------------------------------------------------------
@@ -701,6 +905,9 @@
     $('login-form').addEventListener('submit', submitLogin);
     $('input-form').addEventListener('submit', submitInput);
     setupUploads();
+    setupEffects();
+    setupAppearance();
+    setupLightbox();
     $('toggle-sidebar').addEventListener('click', () => togglePanel('sidebar'));
     $('toggle-members').addEventListener('click', () => togglePanel('members-panel'));
     document.addEventListener('keydown', (e) => {
