@@ -1,6 +1,7 @@
 package limits
 
 import (
+	"net"
 	"net/netip"
 	"sync"
 	"testing"
@@ -134,5 +135,98 @@ func TestBucketAllow(t *testing.T) {
 	}
 	if ok, _ := b.Allow(t0.Add(10 * time.Second)); !ok {
 		t.Fatal("token not refilled")
+	}
+}
+
+func TestListener(t *testing.T) {
+	var lc net.ListenConfig
+	raw, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := NewListener(raw, 10, 2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ln.Close() }()
+	accepted := make(chan net.Conn, 10)
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted <- c
+		}
+	}()
+	var d net.Dialer
+	var clients []net.Conn
+	for range 4 {
+		c, err := d.DialContext(t.Context(), "tcp", raw.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		clients = append(clients, c)
+		defer func() { _ = c.Close() }()
+	}
+	got := []net.Conn{<-accepted, <-accepted}
+	select {
+	case c := <-accepted:
+		t.Fatalf("third connection from one source accepted: %v", c.RemoteAddr())
+	case <-time.After(200 * time.Millisecond):
+	}
+	// The refused connections are closed by the server.
+	_ = clients[3].SetReadDeadline(time.Now().Add(time.Second))
+	if _, err := clients[3].Read(make([]byte, 1)); err == nil {
+		t.Fatal("refused connection left open")
+	}
+	if ln.Count() != 2 {
+		t.Fatalf("count = %d", ln.Count())
+	}
+	_ = got[0].Close()
+	_ = got[0].Close() // idempotent release
+	c, err := d.DialContext(t.Context(), "tcp", raw.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }()
+	select {
+	case <-accepted:
+	case <-time.After(time.Second):
+		t.Fatal("slot not released")
+	}
+}
+
+func TestListenerExempt(t *testing.T) {
+	var lc net.ListenConfig
+	raw, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := NewListener(raw, 3, 1, func(netip.Addr) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ln.Close() }()
+	n := make(chan struct{}, 5)
+	go func() {
+		for {
+			if _, err := ln.Accept(); err != nil {
+				return
+			}
+			n <- struct{}{}
+		}
+	}()
+	var d net.Dialer
+	for range 5 {
+		c, err := d.DialContext(t.Context(), "tcp", raw.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = c.Close() }()
+	}
+	time.Sleep(200 * time.Millisecond)
+	if len(n) != 3 {
+		t.Fatalf("exempt source: %d accepted, want the global cap 3", len(n))
 	}
 }
