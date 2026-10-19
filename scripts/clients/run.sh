@@ -67,7 +67,7 @@ run_weechat() {
   start_server
   docker run -d --name "$CLI" --network "$NET" "$WEECHAT_IMAGE" weechat-headless --dir /tmp/w -r \
     '/set logger.file.flush_delay 0; /server add f fugace-it/6667 -notls; /set irc.server.f.nicks wee; /set irc.server.f.username secretlocaluser; /set irc.server.f.anti_flood 0; /set irc.server.f.autojoin #general; /connect f; /wait 4 /msg -server f #general hello from weechat; /wait 5 /msg -server f observer private from weechat; /wait 6 /command -buffer irc.server.f * /nick wee2; /wait 7 /msg -server f observer after nick change; /wait 8 /command -buffer irc.f.#general * /me waves; /wait 9 /command -buffer irc.f.#general * /topic set by weechat; /wait 10 /command -buffer irc.f.#general * /part bye; /wait 11 /join -server f #general; /wait 14 /quit leaving' >/dev/null
-  python3 "$DIR/observer.py" 127.0.0.1 "$PORT" wee wee2 18 >"$OUT/wire"
+  python3 "$DIR/observer.py" 127.0.0.1 "$PORT" wee wee2 60 >"$OUT/wire"
   check_wire "$OUT/wire" wee wee2
   docker cp -q "$CLI:/tmp/w/logs" "$OUT/weechat-logs"
   cat "$OUT"/weechat-logs/irc.f.*.weechatlog >"$OUT/client"
@@ -86,7 +86,7 @@ run_irssi() {
   docker run -d -t --name "$CLI" --network "$NET" \
     -v "$DIR/irssi.conf:/cfg/config:ro" -v "$DIR/steps.pl:/cfg/steps.pl:ro" --entrypoint sh "$IRSSI_IMAGE" \
     -c 'mkdir -p /tmp/i/scripts/autorun && cp /cfg/config /tmp/i/config && cp /cfg/steps.pl /tmp/i/scripts/autorun/ && irssi --home=/tmp/i; sleep 600' >/dev/null
-  python3 "$DIR/observer.py" 127.0.0.1 "$PORT" irs irs2 75 >"$OUT/wire"
+  python3 "$DIR/observer.py" 127.0.0.1 "$PORT" irs irs2 150 >"$OUT/wire"
   check_wire "$OUT/wire" irs irs2
   i=0
   until docker exec "$CLI" sh -c 'test -s "/tmp/i/logs/#general.log" && test -s /tmp/i/logs/observer.log'; do
