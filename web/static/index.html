@@ -50,7 +50,10 @@
     </header>
     <p id="status" class="status" role="status" hidden></p>
     <ol id="messages" class="messages" aria-live="polite" aria-relevant="additions"></ol>
+    <p id="upload" class="upload" hidden><label for="upload-progress" id="upload-label">Envoi…</label> <progress id="upload-progress" max="100" value="0"></progress></p>
     <form id="input-form" class="composer">
+      <button id="attach" class="attach" type="button" aria-label="Envoyer un fichier ou une image" title="Envoyer un fichier (ou glisser-déposer, ou coller une image)">📎</button>
+      <input id="file" type="file" hidden>
       <label for="input" class="sr-only">Message</label>
       <input id="input" autocomplete="off" placeholder="Message, ou /help" maxlength="2000" spellcheck="true">
       <button type="submit">Envoyer</button>

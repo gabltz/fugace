@@ -13,12 +13,15 @@
   const BACKOFF = [1, 2, 5, 10, 30];
   const STORAGE_KEY = 'fugace.nick';
   const WANTED_CAPS = ['server-time', 'echo-message'];
+  const UPLOAD_TOKEN = 'fugace/UPLOAD=';
+  // Only our own re-encoded images get an inline preview (anti-tracking).
+  const PREVIEW_RE = /^\/f\/[A-Za-z0-9_-]{22}\/[^/]+\.(jpg|png|gif)$/;
 
   const st = {
     ws: null, nick: '', wantNick: '', serverPass: '', adminPass: '',
     registered: false, everRegistered: false, admin: false, closing: false,
     retry: 0, timer: null, buffers: new Map(), active: SERVER,
-    channels: new Set(['#general']), focusNext: '#general',
+    channels: new Set(['#general']), focusNext: '#general', uploadToken: '',
   };
 
   const fold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -171,9 +174,29 @@
       a.rel = 'noopener noreferrer';
       a.target = '_blank';
       parent.append(a);
+      const img = previewOf(url);
+      if (img) parent.append(img);
       last = m.index + url.length;
     }
     if (last < text.length) parent.append(text.slice(last));
+  }
+
+  function previewOf(url) {
+    let u;
+    try { u = new URL(url); } catch { return null; }
+    if (u.origin !== location.origin || !PREVIEW_RE.test(u.pathname)) return null;
+    const a = el('a');
+    a.href = u.href;
+    a.rel = 'noopener noreferrer';
+    a.target = '_blank';
+    const img = el('img', 'preview');
+    img.src = u.pathname;
+    let name = u.pathname.split('/').pop();
+    try { name = decodeURIComponent(name); } catch { /* keep it encoded */ }
+    img.alt = 'Aperçu : ' + name;
+    img.loading = 'lazy';
+    a.append(img);
+    return a;
   }
 
   function renderLine(l) {
@@ -255,6 +278,7 @@
   function connect() {
     clearTimeout(st.timer);
     st.registered = false;
+    st.uploadToken = ''; // tokens die with their connection
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(proto + '//' + location.host + '/ws', 'text.ircv3.net');
     st.ws = ws;
@@ -356,7 +380,10 @@
         }
         return;
       case 'PRIVMSG': case 'NOTICE': return onMessage(m, from, self, at);
-      case '005': case '002': case '003': case '004': case '251': case '254': case '255': case '422': return;
+      case '005':
+        for (const tok of p.slice(1, -1)) if (tok.startsWith(UPLOAD_TOKEN)) st.uploadToken = tok.slice(UPLOAD_TOKEN.length);
+        return;
+      case '002': case '003': case '004': case '251': case '254': case '255': case '422': return;
       default:
         if (/^[45]\d\d$/.test(m.command)) return info(p.slice(1).join(' '), 'error');
         if (/^\d\d\d$/.test(m.command)) return add(buffer(SERVER, 'server'), 'info', p.slice(1).join(' '), { at });
@@ -481,6 +508,7 @@
     '/topic texte : changer le sujet du salon',
     '/close : fermer la conversation privée courante',
     '/quit [message] : se déconnecter',
+    'Fichiers : bouton 📎, glisser-déposer ou coller une image (1 h, puis effacés)',
     'Admin : /oper motdepasse, /join #nouveau (création), /delchan [#salon], /clearhistory [#salon]',
   ];
 
@@ -576,6 +604,56 @@
     say(b.name, text.startsWith('//') ? text.slice(1) : text);
   }
 
+  // --- uploads ----------------------------------------------------------
+  function upload(file) {
+    const b = activeTarget();
+    if (!b) return info('Choisissez un salon ou une conversation avant d’envoyer un fichier.', 'error');
+    if (!st.uploadToken) return info('Envoi de fichiers indisponible pour le moment.', 'error');
+    const xhr = new XMLHttpRequest(); // fetch() has no upload progress
+    xhr.open('POST', '/upload?name=' + encodeURIComponent(file.name || 'image'));
+    xhr.setRequestHeader('Authorization', 'Bearer ' + st.uploadToken);
+    const bar = $('upload-progress');
+    $('upload-label').textContent = 'Envoi de ' + (file.name || 'l’image') + '…';
+    bar.value = 0;
+    $('upload').hidden = false;
+    xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) bar.value = Math.round((e.loaded / e.total) * 100); });
+    xhr.addEventListener('loadend', () => {
+      $('upload').hidden = true;
+      if (xhr.status === 201) {
+        try {
+          const reply = JSON.parse(xhr.responseText);
+          if (typeof reply.url === 'string') say(b.name, reply.url);
+        } catch { info('Réponse d’envoi illisible.', 'error'); }
+        return;
+      }
+      const reasons = { 401: 'connexion requise', 413: 'fichier trop gros', 415: 'image invalide', 429: 'trop d’envois, réessayez dans quelques secondes' };
+      info('Échec de l’envoi : ' + (reasons[xhr.status] || 'erreur ' + xhr.status) + '.', 'error');
+    });
+    xhr.send(file);
+  }
+
+  function setupUploads() {
+    $('attach').addEventListener('click', () => $('file').click());
+    $('file').addEventListener('change', () => {
+      for (const f of $('file').files) upload(f);
+      $('file').value = '';
+    });
+    const chat = document.querySelector('.chat');
+    chat.addEventListener('dragover', (e) => { e.preventDefault(); chat.classList.add('dragging'); });
+    chat.addEventListener('dragleave', () => chat.classList.remove('dragging'));
+    chat.addEventListener('drop', (e) => {
+      e.preventDefault();
+      chat.classList.remove('dragging');
+      for (const f of e.dataTransfer.files) upload(f);
+    });
+    $('input').addEventListener('paste', (e) => {
+      const files = [...(e.clipboardData ? e.clipboardData.files : [])];
+      if (!files.length) return;
+      e.preventDefault();
+      for (const f of files) upload(f);
+    });
+  }
+
   // --- login ------------------------------------------------------------
   function showLogin(error) {
     $('app').hidden = true;
@@ -615,6 +693,7 @@
     $('nick').setAttribute('aria-describedby', 'nick-hint');
     $('login-form').addEventListener('submit', submitLogin);
     $('input-form').addEventListener('submit', submitInput);
+    setupUploads();
     $('toggle-sidebar').addEventListener('click', () => togglePanel('sidebar'));
     $('toggle-members').addEventListener('click', () => togglePanel('members-panel'));
     document.addEventListener('keydown', (e) => {
