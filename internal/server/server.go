@@ -106,7 +106,19 @@ type Options struct {
 	Now                 func() time.Time
 	MaxConns            int
 	MaxConnsPerSource   int
+	// Uploads issues the per-connection upload token announced in 005
+	// (fugace/UPLOAD); nil disables file sharing.
+	Uploads UploadTokens
 }
+
+// UploadTokens issues a token bound to one connection; revoke is called
+// when the connection ends.
+type UploadTokens interface {
+	Issue() (token string, revoke func(), err error)
+}
+
+// UploadISupport is the vendor ISUPPORT token carrying the upload token.
+const UploadISupport = "fugace/UPLOAD"
 
 // Server is the chat core.
 type Server struct {
@@ -275,6 +287,9 @@ func (s *Server) disconnect(c *client, reason string) {
 	s.mu.Unlock()
 
 	s.fanout(nil, peers, irc.Message{Source: mask, Command: "QUIT", Params: []string{reason}})
+	if c.uploadRevoke != nil {
+		c.uploadRevoke() // T9: no upload once the connection is gone
+	}
 	c.finish(reason)
 }
 

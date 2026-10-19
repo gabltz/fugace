@@ -239,6 +239,11 @@ func (s *Server) tryRegister(c *client) (bool, string) {
 		return true, "Bad password"
 	}
 	c.pass = ""
+	if s.opts.Uploads != nil {
+		if token, revoke, err := s.opts.Uploads.Issue(); err == nil {
+			c.uploadToken, c.uploadRevoke = token, revoke
+		}
+	}
 	c.registered.Store(true)
 	s.welcome(c)
 	return false, ""
@@ -266,7 +271,11 @@ func (s *Server) welcome(c *client) {
 	c.reply(s.numeric(c, irc.RplYourHost, "Your host is "+ServerName+", running version "+v))
 	c.reply(s.numeric(c, irc.RplCreated, "This server keeps nothing on disk"))
 	c.reply(s.numeric(c, irc.RplMyInfo, ServerName, v, "o", "no"))
-	c.reply(s.numeric(c, irc.RplISupport, append(s.isupport(), "are supported by this server")...))
+	tokens := s.isupport()
+	if c.uploadToken != "" {
+		tokens = append(tokens, UploadISupport+"="+c.uploadToken)
+	}
+	c.reply(s.numeric(c, irc.RplISupport, append(tokens, "are supported by this server")...))
 	s.lusers(c)
 	c.reply(s.numeric(c, irc.ErrNoMotd, "MOTD File is missing"))
 }

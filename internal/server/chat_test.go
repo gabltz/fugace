@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabltz/fugace/internal/files"
 	"github.com/gabltz/fugace/internal/server"
 )
 
@@ -456,4 +457,45 @@ func TestManyClients(t *testing.T) {
 		t.Error(e)
 	}
 	noIP(t, clients...)
+}
+
+// T9: the upload token is announced in 005 and dies with the connection.
+func TestUploadTokenLifecycle(t *testing.T) {
+	tokens := files.NewTokens(3, 10*time.Second)
+	opts := baseOpts()
+	opts.Uploads = tokens
+	addr, _ := start(t, opts)
+	c := dial(t, addr)
+	c.send("NICK up", "USER u 0 * :u")
+	line := c.expect(" 005 up ")
+	_, after, ok := strings.Cut(line, server.UploadISupport+"=")
+	if !ok {
+		t.Fatalf("no upload token in %q", line)
+	}
+	token, _, _ := strings.Cut(after, " ")
+	if _, ok := tokens.Owner(token); !ok {
+		t.Fatal("announced token is not valid")
+	}
+	other := register(t, addr, "other")
+	for _, l := range other.lines() {
+		if strings.Contains(l, token) {
+			t.Fatal("token shared between connections")
+		}
+	}
+	c.send("QUIT :bye")
+	c.expectClosed()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, ok := tokens.Owner(token); !ok {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("token still valid after QUIT")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Unregistered connections get no token at all.
+	u := dial(t, addr)
+	u.send("NICK late")
+	u.expectNone("UPLOAD", 200*time.Millisecond)
 }
