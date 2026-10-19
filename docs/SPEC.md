@@ -161,11 +161,11 @@ Validation stricte au démarrage : valeur invalide → message d'erreur clair et
 
 ## 8. Client web
 
-- HTML/CSS/JS **vanilla**, sans framework, sans étape de build, sans npm, embarqué via `go:embed`. Poids cible < 60 Ko.
+- HTML/CSS/JS **vanilla**, sans framework, sans étape de build, sans npm, embarqué via `go:embed`. Poids ≤ 128 Ko, police Inter embarquée comprise (ADR 0010).
 - Parle IRC sur WebSocket (spec IRCv3 WebSocket, sous-protocole `text.ircv3.net`).
 - Écran d'accueil : un champ pseudo (+ mot de passe serveur si exigé). Le pseudo peut être mémorisé en `localStorage` côté navigateur (opt-in, case à cocher).
 - Interface : liste des salons et MP, zone de messages, liste des membres, champ de saisie avec commandes `/nick /join /part /msg /me /topic /quit /help`.
 - Upload par bouton, glisser-déposer et coller (Ctrl+V d'image).
 - Reconnexion automatique avec backoff.
-- Thème sombre/clair (prefers-color-scheme), responsive mobile.
+- Thèmes sombre (« Aurora ») et clair (verre givré) suivant `prefers-color-scheme`, avec réglage Auto/Clair/Sombre ; interface en verre dépoli très animée, réglage Animations Auto/Pleines/Réduites (Auto suit `prefers-reduced-motion`) ; responsive mobile (ADR 0010).
 - Rendu texte exclusivement via `textContent` ; liens détectés et créés via DOM avec `rel="noopener noreferrer"`. Codes couleur IRC retirés en v1.
