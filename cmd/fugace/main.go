@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -21,6 +22,8 @@ import (
 	"time"
 
 	"github.com/gabltz/fugace/internal/config"
+	"github.com/gabltz/fugace/internal/files"
+	"github.com/gabltz/fugace/internal/limits"
 	"github.com/gabltz/fugace/internal/server"
 	"github.com/gabltz/fugace/internal/status"
 	"github.com/gabltz/fugace/internal/tlsmgr"
@@ -120,6 +123,7 @@ type httpService struct {
 
 type app struct {
 	cfg    *config.Config
+	files  *files.Store
 	chat   *server.Server
 	tls    *tlsmgr.Manager // nil when FUGACE_TLS=off
 	http   []httpService   // http, https, status
@@ -129,7 +133,8 @@ type app struct {
 
 // listen opens every listener; on error, those already open are closed.
 func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
-	a := &app{cfg: cfg}
+	a := &app{cfg: cfg, files: files.NewStore(cfg.FilesMaxBytes, cfg.FileTTL, nil)}
+	tokens := files.NewTokens(limits.UploadBurst, limits.UploadInterval)
 	defer func() {
 		if err != nil {
 			a.closeListeners() // a, not the nil being returned
@@ -141,6 +146,7 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 		AdminPassword:   cfg.AdminPassword,
 		Channels:        cfg.Channels,
 		HistoryMaxBytes: cfg.HistoryMaxBytes,
+		Uploads:         tokens,
 	}); err != nil {
 		return nil, fmt.Errorf("chat server: %w", err)
 	}
@@ -148,7 +154,10 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("web client: %w", err)
 	}
-	appHandler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(a.chat)})
+	fileHandler := files.NewHandler(files.HandlerOptions{
+		Store: a.files, Tokens: tokens, MaxUpload: cfg.MaxUploadBytes, PublicURL: publicURL(cfg),
+	})
+	appHandler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(a.chat), Files: fileHandler})
 
 	if cfg.TLS == config.TLSOff {
 		if err := a.addHTTP("http", cfg.HTTPAddr, appHandler, nil); err != nil {
@@ -178,6 +187,22 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 		return nil, err
 	}
 	return a, nil
+}
+
+// publicURL is FUGACE_PUBLIC_URL, else https://<first FUGACE_HOST> when TLS
+// is on, else nil (the request Host is used).
+func publicURL(cfg *config.Config) *url.URL {
+	if cfg.PublicURL != nil {
+		return cfg.PublicURL
+	}
+	if len(cfg.Hosts) > 0 && cfg.TLS != config.TLSOff {
+		h := cfg.Hosts[0].String()
+		if cfg.Hosts[0].IsIP() && cfg.Hosts[0].IP.Is6() {
+			h = "[" + h + "]"
+		}
+		return &url.URL{Scheme: "https", Host: h}
+	}
+	return nil
 }
 
 func newTLS(cfg *config.Config) (*tlsmgr.Manager, error) {
@@ -293,6 +318,7 @@ func (a *app) serve(ctx context.Context) error {
 	if a.tls != nil {
 		wg.Go(func() { a.tls.Run(ctx) })
 	}
+	wg.Go(func() { a.files.Run(ctx) })
 
 	var failure error
 	select {
