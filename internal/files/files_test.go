@@ -15,6 +15,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -534,5 +536,53 @@ func TestDelete(t *testing.T) {
 	}
 	if rec := f.get(t, http.MethodGet, reply.ID, ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("get deleted = %d", rec.Code)
+	}
+}
+
+// T6: concurrent uploads from many connections never push the store over
+// its budget; the oldest files make room.
+func TestUploadBudgetUnderConcurrency(t *testing.T) {
+	const (
+		budget  = 256 << 10
+		fileLen = 40 << 10
+		uploads = 3
+		conns   = 16
+	)
+	st := NewStore(budget, time.Hour, nil)
+	tk := NewTokens(uploads, time.Hour)
+	h := NewHandler(HandlerOptions{Store: st, Tokens: tk, MaxUpload: 64 << 10})
+	var wg sync.WaitGroup
+	var peak atomic.Int64
+	stop := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				if used, _ := st.Usage(); used > peak.Load() {
+					peak.Store(used)
+				}
+			}
+		}
+	}()
+	for range conns {
+		tok, _, err := tk.Issue()
+		if err != nil {
+			t.Fatal(err)
+		}
+		wg.Go(func() {
+			for range uploads + 1 { // the last one hits the rate limit
+				req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/upload?name=x.bin", bytes.NewReader(make([]byte, fileLen)))
+				req.Header.Set("Authorization", "Bearer "+tok)
+				h.Upload(httptest.NewRecorder(), req)
+			}
+		})
+	}
+	wg.Wait()
+	close(stop)
+	used, n := st.Usage()
+	if peak.Load() > budget || used > budget || n != budget/fileLen {
+		t.Fatalf("peak %d, used %d, %d files (budget %d)", peak.Load(), used, n, budget)
 	}
 }
