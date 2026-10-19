@@ -17,7 +17,7 @@ Format : contexte → décision → conséquences. Toute nouvelle décision stru
 - **Décision** : état et fichiers en mémoire, rootfs RO, pas de swap.
 - **Conséquences** : redémarrage = remise à zéro ; budget RAM fichiers borné ; pas de scrollback.
 
-## D4. Pas d'historique
+## D4. Pas d'historique — remplacée par ADR 0003 (D15)
 - **Contexte** : tout historique, même en RAM, est une forme de journal.
 - **Décision** : aucun scrollback en v1.
 - **Conséquences** : un rechargement de page web perd la conversation. Réévaluable (ring buffer RAM opt-in) dans un ADR ultérieur.
@@ -37,7 +37,7 @@ Format : contexte → décision → conséquences. Toute nouvelle décision stru
 - **Décision** : JS vanilla embarqué.
 - **Conséquences** : zéro dépendance front, CSP stricte facile.
 
-## D8. Pas de modération en v1
+## D8. Pas de modération en v1 — remplacée par ADR 0003 (D16)
 - **Contexte** : usage privé / petit groupe.
 - **Décision** : pas d'ops ; protection par mot de passe serveur optionnel.
 - **Conséquences** : exposition publique sans mot de passe déconseillée (README).

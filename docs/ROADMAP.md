@@ -21,6 +21,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [ ] JOIN/PART/PRIVMSG/NOTICE/QUIT/NAMES/TOPIC/LIST/WHO/WHOIS/MODE/MOTD/LUSERS/VERSION/TIME
 - [ ] Blocage CTCP DCC
 - [ ] Caps `echo-message`, `server-time`
+- [ ] Historique de salon en RAM (budget, rejeu au JOIN) et admin (`OPER`, salons admin seulement, `DELCHAN`, `CLEARHISTORY`) — ADR 0003
 - [ ] Files d'envoi bornées, SendQ exceeded
 - [ ] Limites anti-abus (ARCHITECTURE §6), rate-limit par IP hachée
 - [ ] Tests d'intégration en Go : N clients TCP simulés, scénario complet
@@ -31,6 +32,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [ ] Transport WS (`text.ircv3.net`), vérification Origin, limite 4 Ko
 - [ ] Client web vanilla : écran pseudo, salons/MP, membres, commandes slash, reconnexion, thème, mobile
 - [ ] Auto-join `#general` côté client web
+- [ ] Affichage de l'historique rejoué, champ « mot de passe admin », commandes `/delchan` `/clearhistory`
 - [ ] Assets embarqués, ETag, CSP stricte, aucun inline
 - [ ] Tests : web ↔ IRC TCP dans le même salon
 - **Acceptation** : un utilisateur web et un utilisateur WeeChat discutent dans `#general` ; lighthouse/axe sans erreur bloquante ; poids front < 60 Ko.
@@ -79,7 +81,6 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## Backlog (post v0.1)
 
-- Ring buffer d'historique RAM opt-in (ADR requis)
 - Rendu des codes de formatage IRC (gras/italique/couleurs)
 - Indicateur de saisie (`+typing`)
 - Jeton ISUPPORT compatible avec les clients supportant un hébergement de fichiers standardisé

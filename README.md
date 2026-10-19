@@ -39,7 +39,7 @@ docker compose up -d --build --force-recreate
 ## Principes
 
 - Un pseudo suffit (`/nick`), pas de compte.
-- Aucun historique : vous ne voyez que ce qui est dit après votre arrivée.
+- Historique des salons en RAM depuis le démarrage, effacé au redémarrage ; aucun historique des messages privés.
 - Rien n'est écrit sur disque ; les fichiers vivent 1 h en RAM puis disparaissent.
 - Les images sont ré-encodées (métadonnées EXIF/GPS supprimées).
 - Aucune IP n'est visible des autres participants ; DCC est bloqué.
