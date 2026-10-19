@@ -132,8 +132,12 @@
         list.append(node);
       }
       while (list.childElementCount > MAX_LINES) list.firstElementChild.remove();
-      if (atBottom) list.scrollTop = list.scrollHeight;
-      else if (live && opts.nick) $('jump').hidden = false;
+      if (atBottom || l.mine) {
+        list.scrollTop = list.scrollHeight; // your own lines always bring you back down
+        $('jump').hidden = true;
+      } else if (live && opts.nick) {
+        $('jump').hidden = false;
+      }
     } else if (opts.nick && (kind === 'msg' || kind === 'action')) {
       b.unread++;
       renderBuffers();
@@ -801,6 +805,14 @@
       const list = $('messages');
       if (list.scrollHeight - list.scrollTop - list.clientHeight < 80) $('jump').hidden = true;
     });
+    // A preview that finishes loading grows the list: stay at the bottom if
+    // the reader was following the conversation.
+    $('messages').addEventListener('load', (e) => {
+      const list = $('messages');
+      if (e.target.tagName === 'IMG' && list.scrollHeight - list.scrollTop - list.clientHeight < e.target.offsetHeight + 120) {
+        list.scrollTop = list.scrollHeight;
+      }
+    }, true);
     $('jump').addEventListener('click', () => {
       const list = $('messages');
       list.scrollTop = list.scrollHeight;

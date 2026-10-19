@@ -355,7 +355,7 @@ body:has(#app:not([hidden])) .fab { display: none; } /* the chat has its own but
 .n4 { color: var(--n4); } .n5 { color: var(--n5); } .n6 { color: var(--n6); } .n7 { color: var(--n7); }
 .preview { display: block; max-width: min(100%, 26rem); max-height: 20rem; margin: .45rem 0 .2rem; border-radius: 16px; border: 1px solid var(--glass-border); box-shadow: 0 14px 34px -14px var(--shadow); cursor: zoom-in; transition: transform var(--t) var(--spring), box-shadow var(--t); }
 .preview:hover { transform: scale(1.015) rotate(-.3deg); box-shadow: 0 20px 44px -14px var(--shadow); }
-.jump { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); border-radius: 999px; padding: .45rem 1rem; color: var(--fg); font-size: .85rem; font-weight: 600; animation: toast-in .45s var(--spring); }
+.jump { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); border-radius: 999px; padding: .45rem 1rem; white-space: nowrap; color: var(--fg); font-size: .85rem; font-weight: 600; animation: toast-in .45s var(--spring); }
 
 /* composer */
 .upload { margin: 0 1rem .5rem; padding: .55rem .9rem; display: flex; gap: .7rem; align-items: center; font-size: .86rem; border-radius: 14px; animation: toast-in .4s var(--spring); }
