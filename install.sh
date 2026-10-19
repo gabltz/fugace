@@ -300,7 +300,7 @@ configure() {
   say "  ${DIM}Optional: a directory holding your own tls.crt and tls.key (used before anything else).${RST}"
   ask C_CERTS "Your own certificate directory" "${FUGACE_CERTS_DIR:-$certs_cur}"
   if [ -n "$C_CERTS" ]; then
-    [ -f "$C_CERTS/tls.crt" ] && [ -f "$C_CERTS/tls.key" ] || die "$C_CERTS must contain tls.crt and tls.key"
+    if [ ! -f "$C_CERTS/tls.crt" ] || [ ! -f "$C_CERTS/tls.key" ]; then die "$C_CERTS must contain tls.crt and tls.key"; fi
     C_CERTS=$(cd "$C_CERTS" && pwd)
   fi
 
