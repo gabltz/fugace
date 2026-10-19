@@ -87,7 +87,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [x] Animations (ressort, View Transitions, indicateur coulissant, boutons magnétiques, ondulations, visionneuse, particules) et réglage Auto/Pleines/Réduites
 - [x] Mobile : tiroirs animés, bouton d'apparence intégré
 - [x] Tests navigateur : thème et animations (préférences système, choix gardés), visionneuse, envoi juste après un changement de conversation ; axe à 0 violation
-- [ ] Tag `v0.2.0`
+- [x] Tag `v0.2.0`
 - **Acceptation** : toute la suite navigateur, les clients IRC et le smoke passent ; budget ≤ 128 Ko ; aucune violation CSP ni erreur console ; axe sans violation en clair, en sombre et sur mobile.
 
 ## M8 — Distribution publique
@@ -97,7 +97,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [x] `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, modèles d'issues et de PR, CHANGELOG en anglais
 - [x] Docs de conception relues pour publication (index `docs/README.md`, arborescence et dépendances réelles)
 - [x] Historique Git vérifié : aucun secret ni fichier sensible
-- [ ] Dépôt et paquet GHCR rendus publics, protections et fonctions de sécurité GitHub activées
+- [x] Dépôt et paquet GHCR rendus publics, protections et fonctions de sécurité GitHub activées
 - **Acceptation** : un visiteur comprend, installe et vérifie fugace depuis le seul README ; CI verte.
 
 ## Backlog (post v0.1)
