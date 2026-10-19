@@ -29,6 +29,14 @@ func Health(w http.ResponseWriter, r *http.Request) {
 type Options struct {
 	Static *Static      // web client
 	WS     http.Handler // IRC over WebSocket
+	Files  FileRoutes   // uploads and downloads
+}
+
+// FileRoutes are the handlers of file sharing (internal/files).
+type FileRoutes interface {
+	Upload(http.ResponseWriter, *http.Request)
+	Serve(http.ResponseWriter, *http.Request)
+	Delete(http.ResponseWriter, *http.Request)
 }
 
 // NewHandler returns the HTTP handler tree.
@@ -41,6 +49,12 @@ func NewHandler(opts Options) http.Handler {
 	}
 	if opts.WS != nil {
 		mux.Handle("GET /ws", opts.WS)
+	}
+	if opts.Files != nil {
+		mux.HandleFunc("POST /upload", opts.Files.Upload)
+		mux.HandleFunc("GET /f/{id}/{name}", opts.Files.Serve)
+		mux.HandleFunc("DELETE /f/{id}", opts.Files.Delete)
+		mux.HandleFunc("DELETE /f/{id}/{name}", opts.Files.Delete)
 	}
 	return SecurityHeaders(mux)
 }
