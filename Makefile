@@ -5,7 +5,7 @@ LDFLAGS   := -s -w -buildid= -X main.version=$(VERSION)
 # Pinned: never run an unversioned tool from the network.
 GOVULNCHECK_VERSION ?= v1.8.0
 
-.PHONY: build test lint vuln fuzz check docker smoke clients browser run clean
+.PHONY: build test lint vuln fuzz check docker smoke clients browser acme run clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="$(LDFLAGS)" -o bin/fugace ./cmd/fugace
@@ -45,6 +45,10 @@ clients: docker
 # Headless Chromium + axe-core against the web client (needs docker).
 browser: docker
 	./scripts/browser/run.sh $(IMAGE)
+
+# ACME issuance against pebble (needs docker).
+acme: docker
+	./scripts/acme/run.sh $(IMAGE)
 
 run: build
 	./bin/fugace
