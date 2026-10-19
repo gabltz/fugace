@@ -26,8 +26,6 @@
 
 ## 3. Interfaces exposées
 
-| Port | Protocole | Rôle |
-|------|-----------|------|
 L'image fait **tout** : elle sert le web directement sur l'hôte, en HTTPS, y compris quand on y accède par une simple IP. Aucun reverse proxy n'est requis.
 
 | Port conteneur | Publié sur l'hôte (compose) | Protocole | Rôle |

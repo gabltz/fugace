@@ -7,7 +7,7 @@ Retenu face à Rust pour ce projet précis (détail dans `adr/0001-decisions.md`
 - Binaire statique `CGO_ENABLED=0` → image `scratch`, aucune libc, aucune surface OS.
 - Stdlib suffisante pour 95 % du besoin : `net`, `net/http`, `crypto/tls`, `image/*`, `embed`, fuzzing natif.
 - Concurrence goroutines/channels naturelle pour un serveur de chat (1 lecteur + 1 écrivain par client).
-- Dépendances tierces visées : **3 maximum** (`github.com/coder/websocket`, `golang.org/x/image/webp`, un client ACME — voir ADR D9).
+- Dépendances tierces : **3 au maximum**, et exactement 3 : `github.com/coder/websocket` (ADR 0005), `golang.org/x/crypto/acme` (ADR 0007), `golang.org/x/image/webp` (ADR 0008).
 
 ## 2. Vue d'ensemble
 
@@ -17,9 +17,9 @@ Retenu face à Rust pour ce projet précis (détail dans `adr/0001-decisions.md`
  hôte:443 → 8443 ┤ https ─┬─ web (statique embarqué)               │
                  │        ├─ transport/ws ─┐                       │
  hôte:6667→ 6667 ┤ transport/tcp ──────────┼─► server (cœur IRC)   │
- hôte:6697→ 6697 ┤ transport/tls ──────────┘   clients, salons     │
+ hôte:6697→ 6697 ┤ tcp + TLS ──────────────┘   clients, salons     │
                  │        └─ files (upload/serve, jetons)          │
-                 │ tlsmgr : monté > ACME (domaine/IP) > autosigné  │
+                 │ tlsmgr : monté > ACME (domaines) > autosigné    │
  127.0.0.1:9090  ┤ status interne (non publié)                     │
                  └─────────────────────────────────────────────────┘
                          tout en RAM, rien sur disque
@@ -27,21 +27,21 @@ Retenu face à Rust pour ce projet précis (détail dans `adr/0001-decisions.md`
 
 **Décision clé** : le client web parle IRC sur WebSocket. Il n'y a donc **qu'un seul protocole et un seul parseur** côté serveur. Le WebSocket n'est qu'un transport de plus, au même titre que TCP et TLS. Bénéfices : surface d'attaque réduite, un seul jeu de tests de conformité, et compatibilité avec d'autres clients web IRC (gamja, Kiwi) en bonus.
 
-## 3. Arborescence cible
+## 3. Arborescence
 
 ```
-cmd/fugace/main.go          point d'entrée, lecture env, sous-commande `healthcheck`
-internal/irc/               parseur/sérialiseur de messages, numerics, validation pseudo/salon
-internal/server/            état (clients, salons), dispatch des commandes, diffusion
-internal/transport/         tcp.go, tls.go, ws.go
-internal/tlsmgr/            source de certificat unique (monté / ACME / autosigné), renouvellement, GetCertificate partagé HTTPS + IRC TLS
-internal/status/            endpoint 127.0.0.1:9090 : mode TLS, expiration du cert, dernier échec ACME (sans détail sensible), nb de connexions
-internal/files/             store RAM (TTL, budget, éviction), sniff, ré-encodage, handlers HTTP
-internal/web/               serveur HTTP, en-têtes de sécurité, statique embarqué
-internal/limits/            rate limiters (token bucket), compteur de connexions par IP hachée
+cmd/fugace/                 point d'entrée : configuration, écoutes, sous-commandes healthcheck/status/version
 internal/config/            lecture et validation des variables d'environnement
-web/static/                 index.html, app.js, style.css (embarqués)
-scripts/smoke.sh            test fumée conteneur (HTTP + IRC)
+internal/irc/               parseur/sérialiseur de messages, numerics, validation pseudo/salon
+internal/server/            état (clients, salons, historique), dispatch des commandes, diffusion, admin
+internal/transport/         IRC sur TCP/TLS (tcp.go) et sur WebSocket (ws.go), X-Forwarded-For
+internal/tlsmgr/            certificat unique (monté / ACME / autosigné), renouvellement, challenges, cache opt-in
+internal/status/            statut interne sur 127.0.0.1:9090 (mode TLS, expiration, dernier échec ACME, connexions)
+internal/files/             store RAM (TTL, budget, éviction), pipeline image, jetons d'envoi, handlers HTTP
+internal/web/               serveur HTTP, en-têtes de sécurité, redirection, HSTS, statique embarqué
+internal/limits/            token buckets, compteur de connexions par source hachée, listener limitant
+web/                        client web embarqué (go:embed) : index.html, app.js, prefs.js, style.css, police
+scripts/                    smoke, clients IRC réels, navigateur, pebble (ACME), charge, contrôles CI
 ```
 
 ## 4. Modèle de concurrence
