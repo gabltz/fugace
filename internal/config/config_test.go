@@ -38,6 +38,9 @@ func TestLoadDefaults(t *testing.T) {
 		{"upload", c.MaxUploadBytes, int64(10 << 20)},
 		{"files", c.FilesMaxBytes, int64(256 << 20)},
 		{"ttl", c.FileTTL, time.Hour},
+		{"admin", c.AdminPassword, ""},
+		{"channels", strings.Join(c.Channels, ","), "#general"},
+		{"history", c.HistoryMaxBytes, int64(64 << 20)},
 	}
 	for _, ck := range checks {
 		if ck.got != ck.want {
@@ -181,6 +184,19 @@ func TestLoadValid(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "channels deduplicated case-insensitively, history disabled",
+			env:  map[string]string{EnvChannels: "#general, #Dev,#dev,#off-topic", EnvHistoryMaxMB: "0", EnvAdminPassword: "longenough"},
+			check: func(t *testing.T, c *Config) {
+				t.Helper()
+				if got := strings.Join(c.Channels, ","); got != "#general,#Dev,#off-topic" {
+					t.Errorf("channels = %q", got)
+				}
+				if c.HistoryMaxBytes != 0 || c.AdminPassword != "longenough" {
+					t.Errorf("history=%d admin set=%v", c.HistoryMaxBytes, c.AdminPassword != "")
+				}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -238,6 +254,12 @@ func TestLoadInvalid(t *testing.T) {
 		{"ttl unitless", map[string]string{EnvFileTTL: "60"}, []string{EnvFileTTL}},
 		{"ttl too short", map[string]string{EnvFileTTL: "10s"}, []string{EnvFileTTL}},
 		{"ttl too long", map[string]string{EnvFileTTL: "48h"}, []string{EnvFileTTL}},
+		{"channel without hash", map[string]string{EnvChannels: "general"}, []string{EnvChannels}},
+		{"channel non ascii", map[string]string{EnvChannels: "#café"}, []string{EnvChannels}},
+		{"channel too long", map[string]string{EnvChannels: "#" + strings.Repeat("a", 32)}, []string{EnvChannels}},
+		{"history negative", map[string]string{EnvHistoryMaxMB: "-1"}, []string{EnvHistoryMaxMB}},
+		{"admin password short", map[string]string{EnvAdminPassword: "short"}, []string{EnvAdminPassword}},
+		{"admin password control", map[string]string{EnvAdminPassword: "abcdefgh\n\x01"}, []string{EnvAdminPassword}},
 		{"value too long", map[string]string{EnvHost: long}, []string{EnvHost}},
 		{
 			"several errors reported together",
