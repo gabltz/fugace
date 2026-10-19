@@ -73,10 +73,10 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M6 — Release v0.1.0
 
-- [ ] README utilisateur complet (démarrage, compose, ports 80/443 et NAT, `FUGACE_HOST` sur IP ou domaine, quotas Let's Encrypt, mode `FUGACE_TLS=off`, limites assumées)
-- [ ] CHANGELOG
+- [x] README utilisateur complet (démarrage, compose, ports 80/443 et NAT, `FUGACE_HOST` sur IP ou domaine, quotas Let's Encrypt, mode `FUGACE_TLS=off`, limites assumées)
+- [x] CHANGELOG
 - [ ] Tag `v0.1.0` → workflow release : image multi-arch amd64/arm64 sur GHCR, SBOM, provenance, signature cosign
-- [ ] Vérification `cosign verify` documentée dans le README
+- [x] Vérification `cosign verify` documentée dans le README
 - **Acceptation** : `docker run ghcr.io/gabltz/fugace:0.1.0` fonctionne sur amd64 et arm64.
 
 ## Backlog (post v0.1)
