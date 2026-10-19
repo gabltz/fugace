@@ -31,14 +31,14 @@
 | T8 | A2 fait planter le parseur | Parseur fuzzé (go fuzz), recover par connexion | Corpus de fuzz en CI — `FuzzParse`, `FuzzDispatch`, `FuzzLoad`, `TestRecoverAbortsWithoutOutput` |
 | T9 | A1 utilise fugace comme hébergeur de fichiers public | Upload impossible sans connexion IRC/WS vivante, TTL court | Test : jeton invalide après QUIT |
 | T10 | A2 usurpe un pseudo via variantes de casse/Unicode | Pseudos ASCII stricts, CASEMAPPING=ascii | Tests unitaires — `TestValidNick`, `TestFold`, `TestNickCollisionAndCase` |
-| T11 | A4 lit le trafic | HTTPS intégré par défaut (HTTP = redirection), IRC TLS 6697 ; documenter que 6667 est en clair | Test : toute requête HTTP hors ACME/healthz → 301 |
+| T11 | A4 lit le trafic | HTTPS intégré par défaut (HTTP = redirection), IRC TLS 6697 ; documenter que 6667 est en clair | Test : toute requête HTTP hors ACME/healthz → 301 — `TestRedirectHandler`, `TestTLSStack`, `scripts/smoke.sh` |
 | T12 | Chaîne d'approvisionnement | 3 dépendances max, `go.sum`, govulncheck, actions épinglées par SHA, image de base par digest, SBOM + provenance + signature cosign | CI |
 | T13 | Évasion conteneur | `scratch`, non-root, cap_drop ALL, no-new-privileges, rootfs RO | Trivy + revue compose |
 | T14 | CSWSH (WebSocket cross-site) | Vérification stricte de l'en-tête `Origin` | Test unitaire — `TestWSOrigin` |
-| T15 | A1 force des émissions ACME (Host/SNI arbitraires) pour épuiser les quotas ou obtenir un cert | Identifiants fixés par `FUGACE_HOST`, aucune émission à la demande | Test : SNI/Host inconnu → cert par défaut, aucun appel ACME |
-| T16 | A5 récupère la clé privée TLS | Clé en RAM uniquement (cache opt-in en 0600) | `docker diff` vide sans cache |
-| T17 | Quotas Let's Encrypt épuisés (recréations répétées) → service indisponible | Repli autosigné immédiat, backoff, cache opt-in, statut consultable | Test avec directory ACME simulé renvoyant `rateLimited` |
-| T18 | A1 abuse du handler `http-01` | Ne répond qu'aux jetons en cours, réponse de taille fixe | Test unitaire |
+| T15 | A1 force des émissions ACME (Host/SNI arbitraires) pour épuiser les quotas ou obtenir un cert | Identifiants fixés par `FUGACE_HOST`, aucune émission à la demande | Test : SNI/Host inconnu → cert par défaut, aucun appel ACME — `TestSNINeverTriggersIssuance`, `scripts/acme/run.sh` (même certificat avec et sans SNI) |
+| T16 | A5 récupère la clé privée TLS | Clé en RAM uniquement (cache opt-in en 0600) | `docker diff` vide sans cache — `scripts/acme/run.sh`, `TestCache` (0600, rien sans `FUGACE_CERT_CACHE`) |
+| T17 | Quotas Let's Encrypt épuisés (recréations répétées) → service indisponible | Repli autosigné immédiat, backoff, cache opt-in, statut consultable | Test avec directory ACME simulé renvoyant `rateLimited` — `TestRateLimited`, `TestFailureCategoriesAndBackoff`, `scripts/acme/run.sh` (échec → autosigné, ≥ 1 h) |
+| T18 | A1 abuse du handler `http-01` | Ne répond qu'aux jetons en cours, réponse de taille fixe | Test unitaire — `TestHTTPChallenge` |
 | T19 | A2 crée/supprime des salons ou vide l'historique sans être admin, ou devine le mot de passe admin | Commandes réservées à `OPER`, comparaison temps constant, déconnexion après 5 échecs | Tests unitaires OPER/DELCHAN/CLEARHISTORY — `TestAdmin`, `TestOperBruteForceDisconnects`, `TestNoAdminConfigured` |
 | T20 | A2 épuise la RAM via l'historique | Budget global `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien, rate-limit des messages | Test unitaire du budget — `TestHistoryBudget`, `TestHistoryDisabledAndOversized` |
 

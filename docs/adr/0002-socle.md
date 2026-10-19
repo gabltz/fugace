@@ -5,7 +5,7 @@ Contexte → décision → conséquences, une entrée par point que la SPEC ne t
 ## D10. Cible du healthcheck avant M3
 - **Contexte** : le statut interne `127.0.0.1:9090` n'arrive qu'en M3, mais l'image doit avoir un healthcheck dès M0.
 - **Décision** : `fugace healthcheck` interroge `http://127.0.0.1:<port de FUGACE_HTTP_ADDR>/healthz` (adresse d'écoute si elle n'est pas « non spécifiée »), délai 2 s, aucune sortie : seul le code retour compte.
-- **Conséquences** : rien n'est écrit dans l'état Docker du conteneur ; bascule vers le statut interne en M3.
+- **Conséquences** : rien n'est écrit dans l'état Docker du conteneur. Depuis M3, `fugace healthcheck` interroge `127.0.0.1:9090/healthz` (statut interne), qui fonctionne aussi avec `FUGACE_TLS=off`.
 
 ## D11. Outils et images épinglés
 - **Contexte** : `govulncheck@latest`, `docker/dockerfile:1` et `apk add ca-certificates` récupéraient du code non figé à chaque build (T12).

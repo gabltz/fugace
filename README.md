@@ -28,7 +28,9 @@ Aucun reverse proxy nécessaire : l'image sert elle-même le web en HTTPS, même
 
 Pour un domaine derrière une box/NAT, redirige 80 et 443 vers l'hôte. Aucun certificat public n'est demandé pour une adresse IP. Let's Encrypt limite à 5 certificats par semaine pour le même ensemble d'identifiants : si tu recrées le conteneur plus souvent, il repasse en autosigné jusqu'à ce que le quota se libère (ou active `FUGACE_CERT_CACHE` avec un volume).
 
-État TLS : `docker exec fugace /fugace status`.
+État TLS (mode, expiration, dernier échec ACME) : `docker exec fugace /fugace status`. Rien n'est journalisé : l'état se consulte à la demande.
+
+Pour ne pas consommer une émission Let's Encrypt à chaque recréation du conteneur, `FUGACE_CERT_CACHE=/cache` avec un volume conserve le compte et le certificat ACME (fichiers en 0600, aucune donnée utilisateur). C'est la seule écriture disque possible, et seulement si cette variable est définie.
 
 Repartir de zéro :
 

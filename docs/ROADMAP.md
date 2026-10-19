@@ -39,14 +39,14 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M3 — HTTPS autonome (web servi directement sur l'hôte, y compris sur IP)
 
-- [ ] ADR : choix et vérification du client ACME (`http-01`/`tls-alpn-01`, ARI ; pas d'ACME pour les IP — ADR 0007)
-- [ ] `internal/tlsmgr` : sources monté (`/certs`, rechargement) > ACME (`FUGACE_HOST`) > autosigné RAM ; `GetCertificate` partagé HTTPS + IRC 6697 ; SNI vide → cert par défaut
-- [ ] Listener HTTP : `/healthz`, `/.well-known/acme-challenge/*`, 301 vers HTTPS pour le reste ; `FUGACE_TLS=off` sert l'appli en clair
-- [ ] ACME (domaines uniquement) : compte éphémère sans e-mail, renouvellement automatique, backoff ≥ 1 h / `Retry-After`, repli autosigné
-- [ ] `FUGACE_CERT_CACHE` opt-in (fichiers 0600), aucune écriture sinon
-- [ ] HSTS uniquement avec cert valide sur nom de domaine
-- [ ] `internal/status` sur 127.0.0.1:9090 + sous-commande `fugace status` ; healthcheck dessus
-- [ ] Tests d'intégration contre **pebble** (serveur ACME de test) en conteneur dans la CI : domaine, IP jamais demandée, échec, `rateLimited`
+- [x] ADR : choix et vérification du client ACME (`http-01`/`tls-alpn-01`, ARI ; pas d'ACME pour les IP — ADR 0007)
+- [x] `internal/tlsmgr` : sources monté (`/certs`, rechargement) > ACME (`FUGACE_HOST`) > autosigné RAM ; `GetCertificate` partagé HTTPS + IRC 6697 ; SNI vide → cert par défaut
+- [x] Listener HTTP : `/healthz`, `/.well-known/acme-challenge/*`, 301 vers HTTPS pour le reste ; `FUGACE_TLS=off` sert l'appli en clair
+- [x] ACME (domaines uniquement) : compte éphémère sans e-mail, renouvellement automatique, backoff ≥ 1 h / `Retry-After`, repli autosigné
+- [x] `FUGACE_CERT_CACHE` opt-in (fichiers 0600), aucune écriture sinon
+- [x] HSTS uniquement avec cert valide sur nom de domaine
+- [x] `internal/status` sur 127.0.0.1:9090 + sous-commande `fugace status` ; healthcheck dessus
+- [x] Tests d'intégration contre **pebble** (serveur ACME de test) en conteneur dans la CI : domaine, IP jamais demandée, échec, `rateLimited`
 - **Acceptation** : sans variable → `https://<ip>` répond (autosigné) et `http://<ip>` redirige ; avec `FUGACE_HOST=<domaine>` → certificat ACME valide (pebble) servi sur 443 et sur 6697 ; `docker diff` vide ; `fugace status` indique le mode et l'expiration.
 
 ## M4 — Fichiers et images
