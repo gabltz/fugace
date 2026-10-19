@@ -73,6 +73,11 @@ code { font-family: ui-monospace, monospace; font-size: .9em; }
 .n0 { color: var(--n0); } .n1 { color: var(--n1); } .n2 { color: var(--n2); } .n3 { color: var(--n3); }
 .n4 { color: var(--n4); } .n5 { color: var(--n5); } .n6 { color: var(--n6); } .n7 { color: var(--n7); }
 .composer { display: flex; gap: .5rem; padding: .6rem .75rem; border-top: 1px solid var(--line); background: var(--panel); }
+.attach { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 0 .6rem; }
+.upload { margin: 0; padding: .35rem .75rem; display: flex; gap: .5rem; align-items: center; font-size: .9rem; border-top: 1px solid var(--line); }
+.upload progress { flex: 1; }
+.chat.dragging { outline: 3px dashed var(--accent); outline-offset: -6px; }
+.preview { display: block; max-width: min(100%, 24rem); max-height: 18rem; margin: .3rem 0; border-radius: 6px; border: 1px solid var(--line); }
 .composer input { flex: 1; min-width: 0; padding: .55rem .7rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 
 /* narrow screens: panels become overlays */
