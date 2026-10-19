@@ -120,3 +120,19 @@ func TestConnsConcurrent(t *testing.T) {
 		t.Fatalf("granted=%d count=%d", granted, c.Count())
 	}
 }
+
+func TestBucketAllow(t *testing.T) {
+	t0 := time.Unix(1_000_000, 0)
+	b := NewBucket(2, 10*time.Second)
+	for i, want := range []bool{true, true, false} {
+		if ok, _ := b.Allow(t0); ok != want {
+			t.Fatalf("allow %d = %v", i, ok)
+		}
+	}
+	if _, wait := b.Allow(t0); wait != 10*time.Second {
+		t.Fatalf("wait = %v (a refusal must not consume)", wait)
+	}
+	if ok, _ := b.Allow(t0.Add(10 * time.Second)); !ok {
+		t.Fatal("token not refilled")
+	}
+}

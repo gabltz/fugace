@@ -35,3 +35,20 @@ func (b *Bucket) Take(now time.Time) time.Duration {
 	}
 	return time.Duration(-b.tokens * float64(b.interval))
 }
+
+// Allow consumes a token at now only if one is available, and otherwise
+// returns false with the time until the next token. It suits requests
+// that are refused rather than delayed (HTTP uploads).
+func (b *Bucket) Allow(now time.Time) (bool, time.Duration) {
+	if !b.last.IsZero() && now.After(b.last) {
+		b.tokens = min(b.tokens+float64(now.Sub(b.last))/float64(b.interval), b.burst)
+	}
+	if now.After(b.last) || b.last.IsZero() {
+		b.last = now
+	}
+	if b.tokens >= 1 {
+		b.tokens--
+		return true, 0
+	}
+	return false, time.Duration((1 - b.tokens) * float64(b.interval))
+}
