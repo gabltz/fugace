@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -73,9 +75,13 @@ func TestServeHealthcheckShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.HTTPAddr = "127.0.0.1:0"
+	cfg.IRCAddr = "127.0.0.1:0"
 	a, err := listen(cfg)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(a.addrs(), "irc=127.0.0.1:") {
+		t.Fatalf("addrs = %q", a.addrs())
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -83,6 +89,16 @@ func TestServeHealthcheckShutdown(t *testing.T) {
 
 	if err := healthcheck(a.httpLn.Addr().String()); err != nil {
 		t.Fatalf("healthcheck: %v", err)
+	}
+	var d net.Dialer
+	irc, err := d.DialContext(t.Context(), "tcp", a.ircLn.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = irc.Close() }()
+	_, _ = irc.Write([]byte("NICK x\r\nUSER x 0 * :x\r\n"))
+	if line, err := bufio.NewReader(irc).ReadString('\n'); err != nil || !strings.Contains(line, " 001 x ") {
+		t.Fatalf("irc welcome: %q %v", line, err)
 	}
 	cancel()
 	select {
@@ -100,6 +116,10 @@ func TestServeHealthcheckShutdown(t *testing.T) {
 
 func TestListenError(t *testing.T) {
 	cfg := &config.Config{HTTPAddr: "256.0.0.1:1"}
+	if _, err := listen(cfg); err == nil {
+		t.Fatal("expected listen error")
+	}
+	cfg = &config.Config{HTTPAddr: "127.0.0.1:0", IRCAddr: "256.0.0.1:1"}
 	if _, err := listen(cfg); err == nil {
 		t.Fatal("expected listen error")
 	}
