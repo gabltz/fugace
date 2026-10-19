@@ -4,11 +4,11 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M0 — Socle du dépôt
 
-- [ ] `go mod init` (Go 1.27), `cmd/fugace/main.go` qui démarre un HTTP `/healthz` et gère `fugace healthcheck`
-- [ ] `internal/config` : lecture + validation des variables de SPEC §7, tests table-driven
-- [ ] Makefile fonctionnel (`build test lint vuln fuzz check docker smoke`)
-- [ ] Dockerfile et compose.yaml fournis : vérifier qu'ils buildent, image < 20 Mo
-- [ ] Épingler toutes les actions GitHub par SHA complet (commentaire `# vX.Y.Z` à côté) et les images de base par digest
+- [x] `go mod init` (Go 1.27), `cmd/fugace/main.go` qui démarre un HTTP `/healthz` et gère `fugace healthcheck`
+- [x] `internal/config` : lecture + validation des variables de SPEC §7, tests table-driven
+- [x] Makefile fonctionnel (`build test lint vuln fuzz check docker smoke`)
+- [x] Dockerfile et compose.yaml fournis : vérifier qu'ils buildent, image < 20 Mo
+- [x] Épingler toutes les actions GitHub par SHA complet (commentaire `# vX.Y.Z` à côté) et les images de base par digest
 - [ ] CI verte de bout en bout
 - **Acceptation** : `docker compose up -d --build` → `curl http://localhost/healthz` = `ok` ; `docker logs` vide ; `docker diff` vide.
 
