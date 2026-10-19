@@ -1,0 +1,8 @@
+go test fuzz v1
+string("0x10,1e3")
+string("AUTO")
+string("localhost:65535")
+string("http://x:65536")
+string("fe80::1%eth0")
+string("9223372036854775808")
+string("-1h")

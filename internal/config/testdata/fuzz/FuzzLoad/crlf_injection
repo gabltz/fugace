@@ -1,0 +1,8 @@
+go test fuzz v1
+string("a.fr\r\nQUIT")
+string("off\x00")
+string("[::1]:6667")
+string("https://u@x")
+string("10.0.0.0/33")
+string("4096")
+string("1h1m")
