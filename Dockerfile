@@ -16,11 +16,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid= -X main.version=${VERSION}" \
       -o /out/fugace ./cmd/fugace
+# Empty mount point for the opt-in certificate cache (FUGACE_CERT_CACHE=/cache):
+# a new volume inherits its owner and mode, and nothing is created at runtime.
+RUN mkdir -p /out/cache
 
 FROM scratch
 # CA roots: needed to reach the ACME API over HTTPS (only used when FUGACE_HOST is set)
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/fugace /fugace
+COPY --from=build --chown=65532:65532 --chmod=0700 /out/cache /cache
 USER 65532:65532
 # 8080 http (redirect + ACME), 8443 https, 6667 irc, 6697 ircs
 EXPOSE 8080 8443 6667 6697
