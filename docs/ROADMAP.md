@@ -93,7 +93,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 ## M8 — Distribution publique
 
 - [x] Licence AGPL-3.0 (`LICENSE`), notices tierces
-- [x] README public en anglais : bannière, badges (CI, release, Go, Go Report Card, licence, image, plateformes, signature, statistiques), captures, démarrage, configuration, sécurité, vérification, développement
+- [x] README public en anglais : bannière, badges (CI, release, Go, Go Reference, licence, image, plateformes, signature, statistiques), captures, démarrage, configuration, sécurité, vérification, développement
 - [x] `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, modèles d'issues et de PR, CHANGELOG en anglais
 - [x] Docs de conception relues pour publication (index `docs/README.md`, arborescence et dépendances réelles)
 - [x] Historique Git vérifié : aucun secret ni fichier sensible
