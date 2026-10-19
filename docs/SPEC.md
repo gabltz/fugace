@@ -114,6 +114,7 @@ plus le jeton vendeur d'upload (§6.2).
 - Authentification : `Authorization: Bearer <jeton>` où le jeton est propre à **une connexion IRC/WS vivante**, communiqué au client dans le 005 via un jeton ISUPPORT vendeur (ex. `fugace/UPLOAD=<jeton>`). Connexion fermée → jeton invalide.
 - Réponse : JSON `{"url": "...", "id": "...", "expires": "RFC3339"}`.
 - `DELETE /f/<id>` avec le même jeton → suppression.
+- Refus : `401` (jeton absent ou révoqué), `411` (sans `Content-Length`), `413` (trop gros, ou trop de pixels), `415` (image invalide), `429` + `Retry-After` (débit, ARCHITECTURE §6).
 
 ### 6.3 Traitement
 
