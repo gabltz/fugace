@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -14,11 +15,15 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gabltz/fugace/internal/config"
 	"github.com/gabltz/fugace/internal/server"
+	"github.com/gabltz/fugace/internal/status"
+	"github.com/gabltz/fugace/internal/tlsmgr"
 	"github.com/gabltz/fugace/internal/transport"
 	"github.com/gabltz/fugace/internal/web"
 	webui "github.com/gabltz/fugace/web"
@@ -54,11 +59,30 @@ func run(args []string, lookup config.LookupFunc, stdout, stderr io.Writer) int 
 	if len(args) == 1 {
 		cmd = args[0]
 	}
-	if cmd == "version" {
+	switch cmd {
+	case "version":
 		_, _ = fmt.Fprintln(stdout, "fugace", version)
 		return exitOK
-	}
-	if cmd != "" && cmd != "healthcheck" {
+	case "healthcheck":
+		// Silent by design: the exit code is the whole answer.
+		ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
+		defer cancel()
+		if status.Healthy(ctx, status.Addr) != nil {
+			return exitFailure
+		}
+		return exitOK
+	case "status":
+		ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
+		defer cancel()
+		r, err := status.Fetch(ctx, status.Addr)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, "fugace: status unavailable (is the server running?)")
+			return exitFailure
+		}
+		_, _ = io.WriteString(stdout, status.Format(r))
+		return exitOK
+	case "":
+	default:
 		usage(stderr)
 		return exitUsage
 	}
@@ -68,23 +92,14 @@ func run(args []string, lookup config.LookupFunc, stdout, stderr io.Writer) int 
 		_, _ = fmt.Fprintf(stderr, "fugace: invalid configuration:\n%v\n", err)
 		return exitUsage
 	}
-
-	if cmd == "healthcheck" {
-		// Silent by design: the exit code is the whole answer.
-		if healthcheck(cfg.HTTPAddr) != nil {
-			return exitFailure
-		}
-		return exitOK
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	a, err := listen(cfg)
+	a, err := listen(cfg, status.Addr)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "fugace: %v\n", err)
 		return exitFailure
 	}
-	_, _ = fmt.Fprintf(stdout, "fugace %s %s tls=%s\n", version, a.addrs(), cfg.TLS)
+	_, _ = fmt.Fprintf(stdout, "fugace %s %s tls=%s\n", version, a.addrs(), a.tlsMode())
 	if err := a.serve(ctx); err != nil {
 		_, _ = fmt.Fprintf(stderr, "fugace: %v\n", err)
 		return exitFailure
@@ -93,130 +108,207 @@ func run(args []string, lookup config.LookupFunc, stdout, stderr io.Writer) int 
 }
 
 func usage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "usage: fugace [healthcheck|version]")
+	_, _ = fmt.Fprintln(w, "usage: fugace [healthcheck|status|version]")
+}
+
+// httpService is one HTTP(S) listener.
+type httpService struct {
+	name string
+	ln   net.Listener
+	srv  *http.Server
 }
 
 type app struct {
-	httpLn  net.Listener
-	httpSrv *http.Server
-	ircLn   net.Listener // nil when disabled
-	chat    *server.Server
+	cfg    *config.Config
+	chat   *server.Server
+	tls    *tlsmgr.Manager // nil when FUGACE_TLS=off
+	http   []httpService   // http, https, status
+	irc    []net.Listener  // irc, ircs (when enabled)
+	ircTag []string
 }
 
-func listen(cfg *config.Config) (*app, error) {
-	chat, err := server.New(server.Options{
+// listen opens every listener; on error, those already open are closed.
+func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
+	a := &app{cfg: cfg}
+	defer func() {
+		if err != nil {
+			a.closeListeners() // a, not the nil being returned
+		}
+	}()
+	if a.chat, err = server.New(server.Options{
 		Version:         version,
 		Password:        cfg.Password,
 		AdminPassword:   cfg.AdminPassword,
 		Channels:        cfg.Channels,
 		HistoryMaxBytes: cfg.HistoryMaxBytes,
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, fmt.Errorf("chat server: %w", err)
-	}
-	var lc net.ListenConfig
-	httpLn, err := lc.Listen(context.Background(), "tcp", cfg.HTTPAddr)
-	if err != nil {
-		return nil, fmt.Errorf("listen http: %w", err)
 	}
 	static, err := web.NewStatic(webui.Static, "static")
 	if err != nil {
-		_ = httpLn.Close()
 		return nil, fmt.Errorf("web client: %w", err)
 	}
-	handler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(chat)})
-	a := &app{httpLn: httpLn, httpSrv: web.NewServer(handler), chat: chat}
-	if cfg.IRCAddr != "" {
-		if a.ircLn, err = lc.Listen(context.Background(), "tcp", cfg.IRCAddr); err != nil {
-			_ = httpLn.Close()
-			return nil, fmt.Errorf("listen irc: %w", err)
+	appHandler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(a.chat)})
+
+	if cfg.TLS == config.TLSOff {
+		if err := a.addHTTP("http", cfg.HTTPAddr, appHandler, nil); err != nil {
+			return nil, err
 		}
+	} else {
+		if a.tls, err = newTLS(cfg); err != nil {
+			return nil, err
+		}
+		redirect := web.NewRedirectHandler(web.RedirectOptions{Challenge: a.tls.HTTPChallenge, PublicURL: cfg.PublicURL})
+		if err := a.addHTTP("http", cfg.HTTPAddr, redirect, nil); err != nil {
+			return nil, err
+		}
+		if err := a.addHTTP("https", cfg.HTTPSAddr, web.HSTS(a.tls.Valid, appHandler), a.tls.HTTPSConfig()); err != nil {
+			return nil, err
+		}
+	}
+	if err := a.addIRC("irc", cfg.IRCAddr, nil); err != nil {
+		return nil, err
+	}
+	if a.tls != nil {
+		if err := a.addIRC("ircs", cfg.IRCSAddr, a.tls.IRCConfig()); err != nil {
+			return nil, err
+		}
+	}
+	if err := a.addHTTP("status", statusAddr, status.Handler(a.report), nil); err != nil {
+		return nil, err
 	}
 	return a, nil
 }
 
-// addrs describes the listeners for the startup line (no user data).
-func (a *app) addrs() string {
-	out := "http=" + a.httpLn.Addr().String()
-	if a.ircLn != nil {
-		out += " irc=" + a.ircLn.Addr().String()
+func newTLS(cfg *config.Config) (*tlsmgr.Manager, error) {
+	opts := tlsmgr.Options{CacheDir: cfg.CertCache}
+	if cfg.ACMEDirectory != nil {
+		opts.ACMEDirectory = cfg.ACMEDirectory.String()
 	}
-	return out
+	for _, h := range cfg.Hosts {
+		if h.IsIP() {
+			opts.IPs = append(opts.IPs, h.IP) // self-signed SAN only, never ACME (ADR 0007)
+		} else {
+			opts.Domains = append(opts.Domains, h.Name)
+		}
+	}
+	m, err := tlsmgr.New(opts)
+	if err != nil {
+		return nil, fmt.Errorf("tls: %w", err)
+	}
+	return m, nil
 }
 
-// serve blocks until ctx is done, then shuts down within shutdownTimeout.
+func (a *app) addHTTP(name, addr string, h http.Handler, tlsCfg *tls.Config) error {
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", name, err)
+	}
+	if tlsCfg != nil {
+		ln = tls.NewListener(ln, tlsCfg)
+	}
+	a.http = append(a.http, httpService{name: name, ln: ln, srv: web.NewServer(h)})
+	return nil
+}
+
+func (a *app) addIRC(name, addr string, tlsCfg *tls.Config) error {
+	if addr == "" {
+		return nil // disabled
+	}
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", name, err)
+	}
+	if tlsCfg != nil {
+		ln = tls.NewListener(ln, tlsCfg)
+	}
+	a.irc = append(a.irc, ln)
+	a.ircTag = append(a.ircTag, name)
+	return nil
+}
+
+func (a *app) closeListeners() {
+	for _, s := range a.http {
+		_ = s.ln.Close()
+	}
+	for _, ln := range a.irc {
+		_ = ln.Close()
+	}
+}
+
+func (a *app) tlsMode() string {
+	if a.tls == nil {
+		return string(config.TLSOff)
+	}
+	return string(a.tls.Status().Mode)
+}
+
+func (a *app) report() status.Report {
+	r := status.Report{Version: version, TLSMode: a.tlsMode(), Connections: a.chat.ConnCount()}
+	if a.tls != nil {
+		st := a.tls.Status()
+		r.CertNotAfter = &st.NotAfter
+		r.TrustedCert = st.Valid
+		r.ACMELastError = st.LastError
+		if !st.NextRetry.IsZero() {
+			r.ACMENextRetry = &st.NextRetry
+		}
+	}
+	return r
+}
+
+// addrs describes the listeners for the startup line (no user data).
+func (a *app) addrs() string {
+	var parts []string
+	for _, s := range a.http {
+		if s.name != "status" {
+			parts = append(parts, s.name+"="+s.ln.Addr().String())
+		}
+	}
+	for i, ln := range a.irc {
+		parts = append(parts, a.ircTag[i]+"="+ln.Addr().String())
+	}
+	return strings.Join(parts, " ")
+}
+
+// serve blocks until ctx is done (or a listener fails), then shuts down
+// within shutdownTimeout.
 func (a *app) serve(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	httpErr := make(chan error, 1)
-	go func() { httpErr <- a.httpSrv.Serve(a.httpLn) }()
-	ircDone := make(chan struct{})
-	go func() {
-		defer close(ircDone)
-		if a.ircLn != nil {
-			_ = transport.ServeIRC(ctx, a.ircLn, a.chat) // returns once ctx is done
-		}
-	}()
+	var wg sync.WaitGroup
+	errc := make(chan error, len(a.http))
+	for _, s := range a.http {
+		wg.Go(func() {
+			if err := s.srv.Serve(s.ln); !errors.Is(err, http.ErrServerClosed) {
+				errc <- fmt.Errorf("serve %s: %w", s.name, err)
+			}
+		})
+	}
+	for _, ln := range a.irc {
+		wg.Go(func() { _ = transport.ServeIRC(ctx, ln, a.chat) }) // returns once ctx is done
+	}
+	if a.tls != nil {
+		wg.Go(func() { a.tls.Run(ctx) })
+	}
 
 	var failure error
 	select {
-	case err := <-httpErr:
-		failure = fmt.Errorf("serve http: %w", err)
+	case failure = <-errc:
 	case <-ctx.Done():
 	}
 	cancel()
-	<-ircDone
 
 	sctx, scancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer scancel()
 	_ = a.chat.Shutdown(sctx) // deadline reached: remaining clients were aborted
-	if err := a.httpSrv.Shutdown(sctx); err != nil {
-		_ = a.httpSrv.Close() // deadline reached: drop the remaining connections
+	for _, s := range a.http {
+		if err := s.srv.Shutdown(sctx); err != nil {
+			_ = s.srv.Close() // deadline reached: drop the remaining connections
+		}
 	}
-	if failure != nil {
-		return failure
-	}
-	if err := <-httpErr; !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("serve http: %w", err)
-	}
-	return nil
-}
-
-// healthURL derives a loopback URL for the local HTTP listener.
-func healthURL(addr string) (string, error) {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return "", fmt.Errorf("parse address: %w", err)
-	}
-	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
-		host = "127.0.0.1"
-	}
-	return "http://" + net.JoinHostPort(host, port) + web.HealthPath, nil
-}
-
-func healthcheck(addr string) error {
-	u, err := healthURL(addr)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
-	if err != nil {
-		return fmt.Errorf("build request: %w", err)
-	}
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(len(web.HealthBody))+1))
-	if err != nil {
-		return fmt.Errorf("read body: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK || string(body) != web.HealthBody {
-		return fmt.Errorf("unhealthy: status %d", resp.StatusCode)
-	}
-	return nil
+	wg.Wait()
+	return failure
 }
