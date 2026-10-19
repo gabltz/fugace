@@ -2,6 +2,8 @@ VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo de
 FUZZTIME  ?= 20s
 IMAGE     ?= fugace:local
 LDFLAGS   := -s -w -buildid= -X main.version=$(VERSION)
+# Pinned: never run an unversioned tool from the network.
+GOVULNCHECK_VERSION ?= v1.8.0
 
 .PHONY: build test lint vuln fuzz check docker smoke run clean
 
@@ -17,7 +19,7 @@ lint:
 		|| (echo "forbidden DOM sink in web/static" && exit 1)
 
 vuln:
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 # Runs every FuzzXxx target found, FUZZTIME each.
 fuzz:
