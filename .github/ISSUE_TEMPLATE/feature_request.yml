@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        fugace stays ephemeral and log-free on purpose: persistence, accounts, logs and telemetry are out of scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and security impact
+      description: Does it store, expose or log anything new? Does it add a dependency?
