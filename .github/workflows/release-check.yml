@@ -59,14 +59,18 @@ jobs:
             docker image rm -f "${IMAGE}@${DIGEST}" >/dev/null 2>&1 || true
             SMOKE_PLATFORM=$p SMOKE_IRC=1 SMOKE_TLS=1 ./scripts/smoke.sh "${IMAGE}@${DIGEST}"
           done
-      - name: GitHub release from the changelog
+      - name: GitHub release from the changelog, with the installer attached
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          sha256sum install.sh > install.sh.sha256
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "release $TAG already exists"; exit 0
+            echo "release $TAG already exists: refreshing the installer assets"
+            gh release upload "$TAG" install.sh install.sh.sha256 --repo "$GITHUB_REPOSITORY" --clobber
+            exit 0
           fi
           v="${TAG#v}"
           awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {f=1; next} f && /^## \[/ {exit} f' CHANGELOG.md > notes.md
           printf '\nImage : `%s@%s` (amd64, arm64), signée cosign, SBOM et provenance attachés.\n' "$IMAGE" "$DIGEST" >> notes.md
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "fugace $TAG" --notes-file notes.md --verify-tag
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "fugace $TAG" --notes-file notes.md --verify-tag \
+            install.sh install.sh.sha256

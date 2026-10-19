@@ -36,6 +36,8 @@ jobs:
         run: ./scripts/check-supply-chain.sh
       - name: Container hardening in compose.yaml
         run: ./scripts/check-compose.sh
+      - name: Installer lint (shellcheck)
+        run: shellcheck -x install.sh
       - name: No dangerous DOM sinks in the web client
         run: |
           if grep -rnE 'innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(' web/static 2>/dev/null; then
@@ -106,6 +108,8 @@ jobs:
         run: SMOKE_IRC=1 SMOKE_TLS=1 ./scripts/smoke.sh fugace:ci
       - name: ACME against pebble (domain, failure, cache)
         run: ./scripts/acme/run.sh fugace:ci
+      - name: Installer (install, reconfigure, uninstall)
+        run: ./scripts/check-installer.sh fugace:ci
       - name: Real IRC clients (WeeChat, irssi)
         run: ./scripts/clients/run.sh fugace:ci all
       - name: Headless browser (XSS, CSP, axe, web <-> IRC)
