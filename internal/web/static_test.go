@@ -11,8 +11,9 @@ import (
 	webui "github.com/gabltz/fugace/web"
 )
 
-// MaxClientBytes is the size budget of the web client (SPEC §8).
-const MaxClientBytes = 60 << 10
+// MaxClientBytes is the size budget of the web client, embedded font
+// included (SPEC §8, ADR 0010).
+const MaxClientBytes = 128 << 10
 
 func embedded(t *testing.T) *Static {
 	t.Helper()
@@ -53,6 +54,8 @@ func TestStaticServing(t *testing.T) {
 		{"stale version", "/static/app.js?v=old", nil, 200, "", cacheRevalid, ""},
 		{"css", "/static/style.css", nil, 200, "text/css; charset=utf-8", "", ""},
 		{"svg", "/static/icon.svg", nil, 200, "image/svg+xml", "", ""},
+		{"font", "/static/inter.woff2?v=" + s.files["inter.woff2"].version, nil, 200, "font/woff2", cacheImmutable, ""},
+		{"css references versioned font", "/static/style.css", nil, 200, "", "", "url(/static/inter.woff2?v=" + s.files["inter.woff2"].version + ")"},
 		{"etag hit", "/static/app.js", map[string]string{"If-None-Match": js.etag}, 304, "", "", ""},
 		{"unknown", "/static/nope.js", nil, 404, "", "", ""},
 		{"traversal", "/static/../embed.go", nil, 404, "", "", ""},
@@ -113,7 +116,7 @@ func TestClientBudgetAndPolicy(t *testing.T) {
 				t.Errorf("%s contains %s", name, bad)
 			}
 		}
-		if name != "icon.svg" && regexp.MustCompile(`(?i)(src|href)\s*=\s*["']?https?:`).MatchString(body) {
+		if !strings.HasSuffix(name, ".svg") && name != "inter.woff2" && regexp.MustCompile(`(?i)(src|href)\s*=\s*["']?https?:`).MatchString(body) {
 			t.Errorf("%s references an external resource", name)
 		}
 	}
