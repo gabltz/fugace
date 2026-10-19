@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("GIF89a<html><script>alert(1)</script>")
