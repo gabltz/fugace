@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ func stack(t *testing.T) (wsURL, tcpAddr string) {
 		t.Fatal(err)
 	}
 	hs := httptest.NewUnstartedServer(nil)
-	hs.Config = web.NewServer(web.NewHandler(web.Options{WS: WSHandler(srv)}))
+	hs.Config = web.NewServer(web.NewHandler(web.Options{WS: WSHandler(srv, nil)}))
 	hs.Start()
 	var lc net.ListenConfig
 	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
@@ -217,7 +218,7 @@ func TestWSOutlivesHTTPTimeouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	hs := httptest.NewUnstartedServer(nil)
-	hs.Config = web.NewServer(web.NewHandler(web.Options{WS: WSHandler(srv)}))
+	hs.Config = web.NewServer(web.NewHandler(web.Options{WS: WSHandler(srv, nil)}))
 	hs.Config.ReadTimeout = 200 * time.Millisecond
 	hs.Config.WriteTimeout = 200 * time.Millisecond
 	hs.Start()
@@ -229,4 +230,67 @@ func TestWSOutlivesHTTPTimeouts(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	w.send("PING :alive")
 	w.expect("PONG fugace :alive")
+}
+
+func TestClientAddr(t *testing.T) {
+	trusted := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("192.0.2.1/32")}
+	tests := []struct {
+		name, remote string
+		xff          []string
+		want         string
+	}{
+		{"direct, header ignored", "203.0.113.5:1234", []string{"198.51.100.9"}, "203.0.113.5"},
+		{"trusted proxy", "10.1.2.3:443", []string{"198.51.100.9"}, "198.51.100.9"},
+		{"chain of proxies", "10.1.2.3:443", []string{"198.51.100.9, 192.0.2.1"}, "198.51.100.9"},
+		{"spoofed leftmost entry", "10.1.2.3:443", []string{"1.2.3.4, 198.51.100.9"}, "198.51.100.9"},
+		{"several headers", "10.1.2.3:443", []string{"198.51.100.7", "192.0.2.1"}, "198.51.100.7"},
+		{"malformed falls back to peer", "10.1.2.3:443", []string{"198.51.100.9, nonsense"}, "10.1.2.3"},
+		{"no header", "10.1.2.3:443", nil, "10.1.2.3"},
+		{"all trusted", "10.1.2.3:443", []string{"10.9.9.9"}, "10.9.9.9"},
+		{"v4-mapped peer", "[::ffff:10.1.2.3]:443", []string{"2001:db8::1"}, "2001:db8::1"},
+	}
+	for _, tt := range tests {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/ws", nil)
+		req.RemoteAddr = tt.remote
+		for _, v := range tt.xff {
+			req.Header.Add("X-Forwarded-For", v)
+		}
+		if got := ClientAddr(req, trusted).String(); got != tt.want {
+			t.Errorf("%s: %s, want %s", tt.name, got, tt.want)
+		}
+	}
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/ws", nil)
+	req.RemoteAddr = "garbage"
+	if ClientAddr(req, trusted).IsValid() {
+		t.Error("garbage RemoteAddr")
+	}
+}
+
+// FUGACE_PASSWORD also guards the WebSocket.
+func TestWSServerPassword(t *testing.T) {
+	srv, err := server.New(server.Options{Password: "letmein", OperFailureDelay: time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hs := httptest.NewUnstartedServer(nil)
+	hs.Config = web.NewServer(web.NewHandler(web.Options{WS: WSHandler(srv, nil)}))
+	hs.Start()
+	defer hs.Close()
+	url := "ws" + strings.TrimPrefix(hs.URL, "http") + "/ws"
+	bad, _, err := dialWS(t, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad.send("PASS :nope")
+	bad.send("NICK w")
+	bad.send("USER w 0 * :w")
+	bad.expect(" 464 w ")
+	good, _, err := dialWS(t, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	good.send("PASS :letmein")
+	good.send("NICK w2")
+	good.send("USER w 0 * :w")
+	good.expect(" 001 w2 ")
 }

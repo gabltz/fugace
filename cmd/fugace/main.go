@@ -12,10 +12,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -157,7 +159,7 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 	fileHandler := files.NewHandler(files.HandlerOptions{
 		Store: a.files, Tokens: tokens, MaxUpload: cfg.MaxUploadBytes, PublicURL: publicURL(cfg),
 	})
-	appHandler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(a.chat), Files: fileHandler})
+	appHandler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(a.chat, cfg.TrustedProxies), Files: fileHandler})
 
 	if cfg.TLS == config.TLSOff {
 		if err := a.addHTTP("http", cfg.HTTPAddr, appHandler, nil); err != nil {
@@ -229,6 +231,19 @@ func (a *app) addHTTP(name, addr string, h http.Handler, tlsCfg *tls.Config) err
 	ln, err := lc.Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", name, err)
+	}
+	if name != "status" {
+		// Per-source cap before TLS: a stalled handshake counts too (T7).
+		trusted := a.cfg.TrustedProxies
+		exempt := func(ip netip.Addr) bool {
+			return slices.ContainsFunc(trusted, func(p netip.Prefix) bool { return p.Contains(ip) })
+		}
+		lim, err := limits.NewListener(ln, limits.MaxHTTPConns, limits.MaxHTTPConnsPerSource, exempt)
+		if err != nil {
+			_ = ln.Close()
+			return fmt.Errorf("listen %s: %w", name, err)
+		}
+		ln = lim
 	}
 	if tlsCfg != nil {
 		ln = tls.NewListener(ln, tlsCfg)
