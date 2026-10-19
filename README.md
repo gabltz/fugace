@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner-fugace.png" alt="fugace — ephemeral, IRC-compatible chat" width="100%">
+  <img src="docs/assets/fugace-banner.png" alt="fugace — ephemeral, IRC-compatible chat" width="100%">
 </p>
 
 <p align="center">
