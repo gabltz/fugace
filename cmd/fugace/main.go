@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/gabltz/fugace/internal/config"
+	"github.com/gabltz/fugace/internal/server"
+	"github.com/gabltz/fugace/internal/transport"
 	"github.com/gabltz/fugace/internal/web"
 )
 
@@ -81,7 +83,7 @@ func run(args []string, lookup config.LookupFunc, stdout, stderr io.Writer) int 
 		_, _ = fmt.Fprintf(stderr, "fugace: %v\n", err)
 		return exitFailure
 	}
-	_, _ = fmt.Fprintf(stdout, "fugace %s http=%s tls=%s\n", version, a.httpLn.Addr(), cfg.TLS)
+	_, _ = fmt.Fprintf(stdout, "fugace %s %s tls=%s\n", version, a.addrs(), cfg.TLS)
 	if err := a.serve(ctx); err != nil {
 		_, _ = fmt.Fprintf(stderr, "fugace: %v\n", err)
 		return exitFailure
@@ -96,34 +98,78 @@ func usage(w io.Writer) {
 type app struct {
 	httpLn  net.Listener
 	httpSrv *http.Server
+	ircLn   net.Listener // nil when disabled
+	chat    *server.Server
 }
 
 func listen(cfg *config.Config) (*app, error) {
+	chat, err := server.New(server.Options{
+		Version:         version,
+		Password:        cfg.Password,
+		AdminPassword:   cfg.AdminPassword,
+		Channels:        cfg.Channels,
+		HistoryMaxBytes: cfg.HistoryMaxBytes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("chat server: %w", err)
+	}
 	var lc net.ListenConfig
-	ln, err := lc.Listen(context.Background(), "tcp", cfg.HTTPAddr)
+	httpLn, err := lc.Listen(context.Background(), "tcp", cfg.HTTPAddr)
 	if err != nil {
 		return nil, fmt.Errorf("listen http: %w", err)
 	}
-	return &app{httpLn: ln, httpSrv: web.NewServer(web.NewHandler())}, nil
+	a := &app{httpLn: httpLn, httpSrv: web.NewServer(web.NewHandler()), chat: chat}
+	if cfg.IRCAddr != "" {
+		if a.ircLn, err = lc.Listen(context.Background(), "tcp", cfg.IRCAddr); err != nil {
+			_ = httpLn.Close()
+			return nil, fmt.Errorf("listen irc: %w", err)
+		}
+	}
+	return a, nil
+}
+
+// addrs describes the listeners for the startup line (no user data).
+func (a *app) addrs() string {
+	out := "http=" + a.httpLn.Addr().String()
+	if a.ircLn != nil {
+		out += " irc=" + a.ircLn.Addr().String()
+	}
+	return out
 }
 
 // serve blocks until ctx is done, then shuts down within shutdownTimeout.
 func (a *app) serve(ctx context.Context) error {
-	errc := make(chan error, 1)
-	go func() { errc <- a.httpSrv.Serve(a.httpLn) }()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	httpErr := make(chan error, 1)
+	go func() { httpErr <- a.httpSrv.Serve(a.httpLn) }()
+	ircDone := make(chan struct{})
+	go func() {
+		defer close(ircDone)
+		if a.ircLn != nil {
+			_ = transport.ServeIRC(ctx, a.ircLn, a.chat) // returns once ctx is done
+		}
+	}()
 
+	var failure error
 	select {
-	case err := <-errc:
-		return fmt.Errorf("serve http: %w", err)
+	case err := <-httpErr:
+		failure = fmt.Errorf("serve http: %w", err)
 	case <-ctx.Done():
 	}
-	sctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
+	cancel()
+	<-ircDone
+
+	sctx, scancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer scancel()
+	_ = a.chat.Shutdown(sctx) // deadline reached: remaining clients were aborted
 	if err := a.httpSrv.Shutdown(sctx); err != nil {
-		// Deadline reached: drop the remaining connections.
-		_ = a.httpSrv.Close()
+		_ = a.httpSrv.Close() // deadline reached: drop the remaining connections
 	}
-	if err := <-errc; !errors.Is(err, http.ErrServerClosed) {
+	if failure != nil {
+		return failure
+	}
+	if err := <-httpErr; !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("serve http: %w", err)
 	}
 	return nil
