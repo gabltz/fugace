@@ -2,6 +2,17 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `install.sh`, a standalone interactive installer: `curl -fsSL https://github.com/gabltz/fugace/releases/latest/download/install.sh | bash`.
+  - It installs, reinstalls from scratch or uninstalls fugace, offering every setting with its default (an empty host means local-only).
+  - It pulls the latest signed image and runs it hardened.
+  - Unattended use: `--install/--reinstall/--uninstall --yes`.
+  - Published with each release, along with its SHA-256.
+- The image is also tagged `latest`.
+- The image ships an empty `/cache` mount point owned by the fugace user, so the opt-in certificate cache volume needs no preparation and `docker diff` stays empty.
+
 ## [0.2.0] - 2026-10-20
 
 A redesign of the web client. The server and the protocol are unchanged.
@@ -60,5 +71,6 @@ First release.
   - ACME against pebble;
   - load, flood and slowloris runs.
 
+[Unreleased]: https://github.com/gabltz/fugace/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/gabltz/fugace/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gabltz/fugace/releases/tag/v0.1.0
