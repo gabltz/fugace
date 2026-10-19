@@ -15,6 +15,11 @@ const failures = [];
 const fail = (msg) => { failures.push(msg); console.log('FAIL: ' + msg); };
 const ok = (msg) => console.log('ok: ' + msg);
 
+// 48x32 JPEG whose EXIF carries a GPS-looking secret (must not survive).
+const PHOTO = Buffer.from('/9j/4QA3RXhpZgAASUkqAAgAAAABAA4BAgAVAAAAGgAAAAAAAABHUFMtNDguODU4NE4tMi4yOTQ1RQD/2wCEAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDIBCQkJDAsMGA0NGDIhHCEyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv/AABEIACAAMAMBIgACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/APJ4rP2q5FZe1asVl7Vcisvavu54k8/C4wyorP2q5FZe1asVl7VcisvauOeJPpMLjDKisvarkVn7VqxWftVyKz9q454k+jwuMMSKy9quRWftWrFZ+1XIrP2rmniT8PwuMMqKz9quRWftWrFZ+1XIrP2rjniT6PC4wyorP2q5FZ+1asVl7Vcis/auOeJPpMLjD//Z', 'base64');
+const GPS = 'GPS-48.8584N';
+const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(9)"><script>alert(10)</script></svg>');
+
 const PAYLOADS = [
   '<img src=x onerror=alert(1)>',
   '<script>alert(2)</script>',
@@ -139,6 +144,37 @@ const texts = (page) => page.$$eval('#messages .line .text', (els) => els.map((e
   await page.press('#input', 'Enter');
   await tcp.waitFor(/:webuser!web@fugace NICK webuser2/).then(() => ok('web /nick'), (e) => fail(e.message));
   await page.click('#channels button');
+
+  // Files (M4): photo with GPS through the attach button, then an SVG.
+  await page.setInputFiles('#file', { name: 'holiday photo.jpg', mimeType: 'image/jpeg', buffer: PHOTO });
+  const photoLine = await tcp.waitFor(/:webuser2!web@fugace PRIVMSG #general :https:\/\/fugace-it:8443\/f\/[A-Za-z0-9_-]{22}\/holiday_photo\.jpg$/, 10000)
+    .catch((e) => { fail(e.message); return ''; });
+  const photoURL = photoLine.split(' :').pop();
+  if (photoURL) {
+    await page.waitForFunction(() => [...document.querySelectorAll('#messages img.preview')].some((i) => i.complete && i.naturalWidth === 48), null, { timeout: 5000 })
+      .then(() => ok('upload: link posted, same-origin preview displayed'), () => fail('preview not displayed'));
+    const res = await page.request.get(photoURL);
+    const body = await res.body();
+    const h = res.headers();
+    if (h['content-type'] !== 'image/jpeg' || body.includes(GPS) || body.includes('Exif') || !h['content-security-policy'].includes('sandbox') || !h['content-disposition'].startsWith('inline')) {
+      fail('served photo: ' + JSON.stringify(h));
+    } else ok('photo served re-encoded without EXIF/GPS, CSP sandbox');
+  }
+  await page.setInputFiles('#file', { name: 'evil.svg', mimeType: 'image/svg+xml', buffer: SVG });
+  const svgLine = await tcp.waitFor(/PRIVMSG #general :https:\/\/fugace-it:8443\/f\/[A-Za-z0-9_-]{22}\/evil\.svg$/, 10000).catch((e) => { fail(e.message); return ''; });
+  if (svgLine) {
+    const res = await page.request.get(svgLine.split(' :').pop());
+    const h = res.headers();
+    const previews = await page.$$eval('#messages img.preview', (is) => is.filter((i) => i.src.endsWith('.svg')).length);
+    if (h['content-type'] !== 'application/octet-stream' || !h['content-disposition'].startsWith('attachment') || h['x-content-type-options'] !== 'nosniff' || previews) {
+      fail('svg served as ' + JSON.stringify(h));
+    } else ok('svg with script: attachment, octet-stream, nosniff, no preview');
+  }
+  tcp.send('PRIVMSG #general :look http://example.com/tracker.png');
+  await page.waitForFunction(() => [...document.querySelectorAll('#messages .text')].some((e) => e.textContent.includes('tracker.png')), null, { timeout: 5000 });
+  if (await page.$$eval('#messages img.preview', (is) => is.some((i) => !i.src.startsWith(location.origin)))) fail('external image previewed');
+  else ok('external image link not loaded');
+
   await axe(page, 'chat');
 
   // Mobile
