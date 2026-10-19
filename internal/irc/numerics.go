@@ -13,6 +13,7 @@ const (
 	RplLuserMe         = "255"
 	RplWhoisUser       = "311"
 	RplWhoisServer     = "312"
+	RplWhoisOperator   = "313"
 	RplEndOfWho        = "315"
 	RplEndOfWhois      = "318"
 	RplWhoisChannels   = "319"
@@ -30,6 +31,7 @@ const (
 	RplNamReply        = "353"
 	RplEndOfNames      = "366"
 	RplEndOfBanList    = "368"
+	RplYoureOper       = "381"
 	RplTime            = "391"
 
 	ErrNoSuchNick        = "401"
@@ -54,7 +56,9 @@ const (
 	ErrPasswdMismatch    = "464"
 	ErrChannelIsFull     = "471"
 	ErrBadChanMask       = "476"
+	ErrNoPrivileges      = "481"
 	ErrChanOPrivsNeeded  = "482"
+	ErrNoOperHost        = "491"
 	ErrUmodeUnknownFlag  = "501"
 	ErrUsersDontMatch    = "502"
 )
