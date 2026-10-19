@@ -30,7 +30,7 @@ const (
 	DefaultPingTimeout         = 180 * time.Second
 	DefaultRegistrationTimeout = 30 * time.Second
 	DefaultTickInterval        = 5 * time.Second
-	// OperFailureDelay slows down password guessing on OPER.
+	// OperFailureDelay slows down password guessing (OPER and server PASS).
 	OperFailureDelay = 2 * time.Second
 	// historyChunk bounds how many history entries are copied at once.
 	historyChunk = 128
