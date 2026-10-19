@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-label="fugace — ephemeral, IRC-compatible chat">
+  <defs>
+    <radialGradient id="b1" cx="18%" cy="10%" r="55%"><stop offset="0" stop-color="#7c3aed" stop-opacity=".85"/><stop offset="1" stop-color="#7c3aed" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b2" cx="88%" cy="20%" r="50%"><stop offset="0" stop-color="#2563eb" stop-opacity=".7"/><stop offset="1" stop-color="#2563eb" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b3" cx="45%" cy="115%" r="55%"><stop offset="0" stop-color="#06b6d4" stop-opacity=".55"/><stop offset="1" stop-color="#06b6d4" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b4" cx="95%" cy="100%" r="45%"><stop offset="0" stop-color="#db2777" stop-opacity=".5"/><stop offset="1" stop-color="#db2777" stop-opacity="0"/></radialGradient>
+    <linearGradient id="t" x1="0" x2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset=".45" stop-color="#93c5fd"/><stop offset="1" stop-color="#67e8f9"/></linearGradient>
+    <radialGradient id="o1" cx="30%" cy="30%"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#7c3aed"/></radialGradient>
+    <radialGradient id="o2" cx="30%" cy="30%"><stop offset="0" stop-color="#a5f3fc"/><stop offset="1" stop-color="#0891b2"/></radialGradient>
+    <radialGradient id="o3" cx="30%" cy="30%"><stop offset="0" stop-color="#fbcfe8"/><stop offset="1" stop-color="#db2777"/></radialGradient>
+  </defs>
+  <rect width="1280" height="320" rx="28" fill="#07070d"/>
+  <rect width="1280" height="320" rx="28" fill="url(#b1)"/>
+  <rect width="1280" height="320" rx="28" fill="url(#b2)"/>
+  <rect width="1280" height="320" rx="28" fill="url(#b3)"/>
+  <rect width="1280" height="320" rx="28" fill="url(#b4)"/>
+  <rect x="120" y="70" width="1040" height="180" rx="30" fill="#14142a" fill-opacity=".55" stroke="#ffffff" stroke-opacity=".1"/>
+  <g transform="translate(190 120)" opacity=".95">
+    <ellipse cx="34" cy="44" rx="32" ry="30" fill="url(#o1)"/>
+    <ellipse cx="62" cy="36" rx="30" ry="31" fill="url(#o2)" fill-opacity=".85"/>
+    <ellipse cx="46" cy="64" rx="30" ry="28" fill="url(#o3)" fill-opacity=".85"/>
+  </g>
+  <text x="310" y="168" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="84" font-weight="800" letter-spacing="-3" fill="url(#t)">fugace</text>
+  <text x="314" y="212" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" fill="#d4d6f2">Ephemeral, IRC-compatible chat · no accounts · no logs · nothing on disk</text>
+</svg>
