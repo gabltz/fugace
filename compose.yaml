@@ -25,10 +25,12 @@ services:
       - "443:8443"        # https: web client, websocket, files
       - "6667:6667"       # irc (plaintext)
       - "6697:6697"       # irc over tls (same certificate as https)
-    # Everything below is optional. Without it: self-signed HTTPS, works on any IP.
+    # Everything below is optional. Without it: self-signed HTTPS, works on any IP (LAN).
     # environment:
-    #   FUGACE_HOST: "203.0.113.10"            # public IP and/or domain(s) -> Let's Encrypt cert
+    #   FUGACE_HOST: "chat.example.org"        # domain(s) -> Let's Encrypt cert; an IP only extends the self-signed one
     #   FUGACE_PASSWORD: "change-me"           # shared server password
+    #   FUGACE_ADMIN_PASSWORD: "change-me-too" # admin: /oper admin <password>, creates/deletes channels
+    #   FUGACE_CHANNELS: "#general,#random"    # channels created at startup
     #   FUGACE_CERT_CACHE: "/cache"            # keep the ACME cert across re-creations (see below)
     # volumes:
     #   - ./certs:/certs:ro                    # your own certificate (tls.crt + tls.key)
