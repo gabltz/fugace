@@ -46,6 +46,16 @@ docker compose up -d --build --force-recreate
 - Les images sont ré-encodées (métadonnées EXIF/GPS supprimées).
 - Aucune IP n'est visible des autres participants ; DCC est bloqué.
 
+## Fichiers depuis un client IRC
+
+Le serveur annonce un jeton d'envoi propre à votre connexion dans le `005` (`fugace/UPLOAD=<jeton>`, visible dans le tampon serveur de votre client). Il reste valable tant que la connexion est ouverte :
+
+```sh
+curl -k -H "Authorization: Bearer <jeton>" --data-binary @photo.jpg "https://<hôte>/upload?name=photo.jpg"
+```
+
+La réponse JSON contient l'URL à coller dans le salon. Les images sont ré-encodées (EXIF/GPS supprimés), les autres fichiers sont servis en téléchargement. Tout disparaît au bout d'une heure.
+
 ## Limites à connaître
 
 - Votre client IRC journalise probablement en local : c'est hors de portée du serveur.

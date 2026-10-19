@@ -51,13 +51,13 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 
 ## M4 — Fichiers et images
 
-- [ ] `internal/files` : store RAM (TTL, budget, éviction LRU par âge), IDs 128 bits
-- [ ] Jeton d'upload par connexion annoncé en 005, invalidé au QUIT
-- [ ] `POST /upload`, `GET|DELETE /f/{id}/{name}`
-- [ ] Sniff magic bytes, plafond pixels, ré-encodage jpeg/png/gif (animé)/webp→png
-- [ ] En-têtes de sécurité fichiers (ARCHITECTURE §7)
-- [ ] Client web : bouton, drag & drop, coller, aperçu same-origin, barre de progression
-- [ ] Fuzz du pipeline image (`FuzzSanitize`)
+- [x] `internal/files` : store RAM (TTL, budget, éviction LRU par âge), IDs 128 bits
+- [x] Jeton d'upload par connexion annoncé en 005, invalidé au QUIT
+- [x] `POST /upload`, `GET|DELETE /f/{id}/{name}`
+- [x] Sniff magic bytes, plafond pixels, ré-encodage jpeg/png/gif (animé)/webp→png
+- [x] En-têtes de sécurité fichiers (ARCHITECTURE §7)
+- [x] Client web : bouton, drag & drop, coller, aperçu same-origin, barre de progression
+- [x] Fuzz du pipeline image (`FuzzSanitize`)
 - **Acceptation** : une photo avec GPS uploadée ressort sans EXIF ; un SVG avec `<script>` est téléchargé et jamais rendu ; jeton invalide après QUIT ; fichiers expirés à TTL.
 
 ## M5 — Durcissement
