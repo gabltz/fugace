@@ -99,6 +99,8 @@ func TestBytes(t *testing.T) {
 		{Message{Command: "PING", Params: []string{"tok"}}, "PING tok\r\n", nil},
 		{Message{Source: "fugace", Command: "001", Params: []string{"bob", "Welcome bob"}}, ":fugace 001 bob :Welcome bob\r\n", nil},
 		{Message{Command: "TOPIC", Params: []string{"#a", ""}}, "TOPIC #a :\r\n", nil},
+		{Message{Command: "PRIVMSG", Params: []string{"bob", "1"}}, "PRIVMSG bob :1\r\n", nil},
+		{Message{Command: "JOIN", Params: []string{"#a"}}, "JOIN #a\r\n", nil},
 		{Message{Command: "PRIVMSG", Params: []string{"#a", ":)"}}, "PRIVMSG #a ::)\r\n", nil},
 		{Message{Tags: []Tag{{"time", "t"}, {"k", "a b;c\\\r\n"}, {"flag", ""}}, Command: "PING"}, "@time=t;k=a\\sb\\:c\\\\\\r\\n;flag PING\r\n", nil},
 		{Message{Command: "PRIVMSG", Params: []string{"a b", "x"}}, "", ErrInvalidParam},

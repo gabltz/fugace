@@ -289,14 +289,16 @@ func (m *Message) Bytes() ([]byte, error) {
 		if strings.ContainsAny(p, "\x00\r\n") {
 			return nil, ErrInvalidParam
 		}
-		if p == "" || p[0] == ':' || strings.ContainsRune(p, ' ') {
+		// Like most servers, always use the trailing form when there are
+		// several parameters: some clients expect it for the text.
+		if p == "" || p[0] == ':' || strings.ContainsRune(p, ' ') || len(m.Params) > 1 {
 			b.WriteByte(':')
 		}
 		room := MaxLineLen - len(crlf) - (b.Len() - tagsLen)
 		if room < 0 {
 			return nil, ErrLineTooLong
 		}
-		b.WriteString(truncateUTF8(p, room))
+		b.WriteString(TruncateUTF8(p, room))
 	}
 	if b.Len()-tagsLen+len(crlf) > MaxLineLen {
 		return nil, ErrLineTooLong
@@ -310,8 +312,8 @@ func validMiddle(s string) bool {
 	return s != "" && s[0] != ':' && !strings.ContainsAny(s, " \x00\r\n")
 }
 
-// truncateUTF8 cuts s to at most n bytes without splitting a rune.
-func truncateUTF8(s string, n int) string {
+// TruncateUTF8 cuts s to at most n bytes without splitting a rune.
+func TruncateUTF8(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
