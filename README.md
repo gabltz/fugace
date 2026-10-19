@@ -63,6 +63,33 @@ Most chat tools remember everything: accounts, logs, histories, metadata. fugace
 ## Quick start
 
 ```sh
+curl -fsSL https://github.com/gabltz/fugace/releases/latest/download/install.sh | bash
+```
+
+That's all you need: Docker plus this one line, and no clone. The installer offers to **install**, **reinstall from scratch** or **uninstall**, then:
+
+- **Configuration.** It walks you through every setting. Press Enter to keep the default; leave the host empty for local-only use (self-signed HTTPS on your network).
+- **Image.** It pulls the latest official image and checks its signature if `cosign` is installed.
+- **Container.** It starts fugace with every hardening option (read-only, no capabilities, no logs, no swap) and waits until it is healthy.
+
+<details>
+<summary>Read the script first, or run it unattended</summary>
+
+```sh
+curl -fsSLO https://github.com/gabltz/fugace/releases/latest/download/install.sh
+curl -fsSL https://github.com/gabltz/fugace/releases/latest/download/install.sh.sha256 | sha256sum -c
+less install.sh && bash install.sh
+
+# Unattended: answers come from FUGACE_* variables, everything else keeps its default
+FUGACE_HOST=chat.example.org FUGACE_ADMIN_PASSWORD='change-me-please' bash install.sh --install --yes
+```
+
+`install.sh --help` lists the options (`--install`, `--reinstall`, `--uninstall`, `--yes`, `--version`).
+</details>
+
+Prefer plain Docker? This is equivalent to the defaults:
+
+```sh
 docker run -d --name fugace --read-only --cap-drop ALL --security-opt no-new-privileges:true \
   --log-driver none -p 80:8080 -p 443:8443 -p 6667:6667 -p 6697:6697 \
   ghcr.io/gabltz/fugace:0.2
