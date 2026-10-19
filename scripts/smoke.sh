@@ -10,14 +10,15 @@ cleanup() { docker rm -f "$NAME" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 # Default log driver on purpose: the output is inspected at the end (T1).
-docker run -d --name "$NAME" --read-only --cap-drop ALL \
+# SMOKE_PLATFORM runs another architecture (e.g. linux/arm64 under QEMU).
+docker run -d --name "$NAME" ${SMOKE_PLATFORM:+--platform "$SMOKE_PLATFORM"} --read-only --cap-drop ALL \
   --security-opt no-new-privileges:true \
   -p 18080:8080 -p 18443:8443 -p 16667:6667 -p 16697:6697 \
   "$IMAGE" >/dev/null
 
 i=0
 until curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1; do
-  i=$((i + 1)); [ "$i" -gt 30 ] && { echo "healthz timeout"; exit 1; }
+  i=$((i + 1)); [ "$i" -gt 90 ] && { echo "healthz timeout"; exit 1; }
   sleep 1
 done
 echo "ok: healthz"
