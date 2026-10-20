@@ -122,8 +122,9 @@ With a self-signed certificate, disable certificate verification in your client 
 
 | | |
 |---|---|
-| **Chat** | Channels and private messages, `/me`, topics. IRCv3 `server-time`, `echo-message`, `message-tags`. Verified with real WeeChat and irssi in CI |
+| **Chat** | Channels and private messages, `/me`, topics. IRCv3 `server-time`, `echo-message`, `message-tags`, `draft/message-redaction`. Verified with real WeeChat and irssi in CI |
 | **Web client** | Vanilla JS with no build step and no third-party request. Glass panels over an animated aurora, dark and light themes that follow your system, spring animations, view transitions, image lightbox, drag-and-drop and paste uploads. Full/reduced motion setting that honours `prefers-reduced-motion`. Mobile-ready |
+| **Your messages, your call** | Delete any of your own messages, in channels and private messages, for everyone and from the history (IRCv3 `draft/message-redaction`). A profile picture, kept in RAM only while you are connected. **Clear account** (bottom left in the web client, `/clear-account` from IRC, `/quote CLEARACCOUNT` in WeeChat) erases your messages, files and picture, then disconnects you. No account: the web client keeps a random key in your browser, the server only a keyed hash of it |
 | **History** | Each channel keeps, in RAM only, everything said since the server started (global memory budget, oldest first out) and replays it, with original timestamps, to whoever joins. There is no history of private messages |
 | **Files & images** | Up to 10 MB per file and 256 MB in total, deleted after 1 hour. JPEG, PNG, animated GIF and WebP are re-encoded (EXIF and GPS removed, orientation kept). Everything else, SVG included, is served as a download, never rendered |
 | **HTTPS** | Mounted certificate > Let's Encrypt for your domain > self-signed in RAM. The same certificate serves IRC over TLS. Renewed automatically, with a ≥ 1 h back-off on failure so a rate limit never locks you out |

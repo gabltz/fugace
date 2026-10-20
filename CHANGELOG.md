@@ -10,8 +10,20 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
   - It pulls the latest signed image and runs it hardened.
   - Unattended use: `--install/--reinstall/--uninstall --yes`.
   - Published with each release, along with its SHA-256.
+- **Delete your messages**: a delete button on your own messages in the web client (two clicks), `REDACT` from IRC (IRCv3 `draft/message-redaction`). The message leaves the channel history and disappears for every client that supports redaction. Only the author can delete, the admin cannot.
+- **Profile picture**: choose it at the bottom left of the web client. It is cropped to 128 × 128, kept in RAM while you are connected, shown to other connected users only, and sent again by your browser when you come back.
+- **Clear account**: the "Effacer mon compte" button, or `/clear-account` (`CLEAR-ACCOUNT`, alias `CLEARACCOUNT`) from IRC, deletes your messages, files and picture, then disconnects you. The web client also forgets your nickname, key and picture.
+- **Author identity without accounts**: the web client sends a random key kept in the browser (`KEY`), and the server keeps only a keyed hash of it until it restarts. IRC clients without a key get an identity scoped to their connection.
+- Each message carries a `msgid`; the `fugace/own` tag marks your own messages; the `fugace/avatar` capability announces picture changes.
 - The image is also tagged `latest`.
 - The image ships an empty `/cache` mount point owned by the fugace user, so the opt-in certificate cache volume needs no preparation and `docker diff` stays empty.
+
+### Changed
+- Files you upload now belong to your identity rather than to a single connection.
+- The web client budget is now 160 KB including the font.
+
+### Fixed
+- The login button no longer drifts around under the pointer.
 
 ## [0.2.0] - 2026-10-20
 

@@ -100,6 +100,18 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [x] Dépôt et paquet GHCR rendus publics, protections et fonctions de sécurité GitHub activées
 - **Acceptation** : un visiteur comprend, installe et vérifie fugace depuis le seul README ; CI verte.
 
+## M9 — Identité, suppression, photo de profil (v0.3.0)
+
+- [x] ADR 0012 : identité d'auteur par clé de navigateur, `REDACT`, photos, « Clear account »
+- [x] `msgid` et `fugace/own`, `REDACT` (salons et messages privés, auteur seul), retrait de l'historique
+- [x] Photos de profil : `/avatar`, cap `fugace/avatar`, envoi depuis le bas gauche du client web, renvoi à la reconnexion
+- [x] « Effacer mon compte » et `/clear-account` (`CLEAR-ACCOUNT`) : messages, fichiers, photo, mémoire du navigateur
+- [x] Bouton d'accueil stabilisé (effet magnétique retiré et borné)
+- [x] Image : point de montage `/cache`, tag `latest`, installeur publié avec la release
+- [x] Tests serveur, fichiers, fuzz, navigateur (suppression, photo, bouton d'accueil, Clear account)
+- [ ] Tag `v0.3.0`
+- **Acceptation** : suites Go, navigateur, clients IRC, smoke et installeur vertes ; aucune violation CSP ni erreur console ; axe sans violation.
+
 ## Backlog (post v0.1)
 
 - Rendu des codes de formatage IRC (gras/italique/couleurs)
