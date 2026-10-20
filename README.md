@@ -92,7 +92,7 @@ Prefer plain Docker? This is equivalent to the defaults:
 ```sh
 docker run -d --name fugace --read-only --cap-drop ALL --security-opt no-new-privileges:true \
   --log-driver none -p 80:8080 -p 443:8443 -p 6667:6667 -p 6697:6697 \
-  ghcr.io/gabltz/fugace:0.2
+  ghcr.io/gabltz/fugace:0.3
 ```
 
 Or, from a clone of this repository, with every hardening option preset (no swap, pids and file limits, `logging: none`):
@@ -234,11 +234,11 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 Every release is built for amd64 and arm64 and signed keylessly with [cosign](https://github.com/sigstore/cosign). It ships with an SBOM and a SLSA provenance attestation:
 
 ```sh
-cosign verify ghcr.io/gabltz/fugace:0.2 \
+cosign verify ghcr.io/gabltz/fugace:0.3 \
   --certificate-identity-regexp 'https://github.com/gabltz/fugace/.github/workflows/release.yml@refs/tags/v.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 
-docker buildx imagetools inspect ghcr.io/gabltz/fugace:0.2 --format '{{json .SBOM}}'
+docker buildx imagetools inspect ghcr.io/gabltz/fugace:0.3 --format '{{json .SBOM}}'
 ```
 
 Before anything is pushed, the release workflow tests the tagged commit again and scans it with Trivy. After publishing, it checks the signature and runs the smoke test on both architectures from the registry.
