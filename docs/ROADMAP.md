@@ -109,7 +109,7 @@ Règles : un jalon = une branche `mX-...` = une PR. On ne commence un jalon que 
 - [x] Bouton d'accueil stabilisé (effet magnétique retiré et borné)
 - [x] Image : point de montage `/cache`, tag `latest`, installeur publié avec la release
 - [x] Tests serveur, fichiers, fuzz, navigateur (suppression, photo, bouton d'accueil, Clear account)
-- [ ] Tag `v0.3.0`
+- [x] Tag `v0.3.0`
 - **Acceptation** : suites Go, navigateur, clients IRC, smoke et installeur vertes ; aucune violation CSP ni erreur console ; axe sans violation.
 
 ## Backlog (post v0.1)

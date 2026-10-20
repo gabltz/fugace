@@ -4,6 +4,10 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-20
+
+Delete your messages, pick a profile picture, clear your account. Plus a one-line installer.
+
 ### Added
 - `install.sh`, a standalone interactive installer: `curl -fsSL https://github.com/gabltz/fugace/releases/latest/download/install.sh | bash`.
   - It installs, reinstalls from scratch or uninstalls fugace, offering every setting with its default (an empty host means local-only).
@@ -83,6 +87,7 @@ First release.
   - ACME against pebble;
   - load, flood and slowloris runs.
 
-[Unreleased]: https://github.com/gabltz/fugace/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/gabltz/fugace/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/gabltz/fugace/releases/tag/v0.3.0
 [0.2.0]: https://github.com/gabltz/fugace/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gabltz/fugace/releases/tag/v0.1.0
