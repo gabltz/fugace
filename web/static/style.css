@@ -275,8 +275,21 @@ body:has(#app:not([hidden])) .fab { display: none; } /* the chat has its own but
 .buffers button[aria-current=true] .unread { background: rgb(255 255 255 / .25); }
 .unread.bump { animation: bump .5s var(--spring); }
 @keyframes bump { 0% { transform: scale(.4); } 60% { transform: scale(1.25); } }
-.me { margin-top: auto; display: flex; gap: .6rem; align-items: center; padding: .7rem .5rem 0; border-top: 1px solid var(--glass-border); font-size: .85rem; }
+.me { margin-top: auto; display: grid; gap: .45rem; padding: .7rem .4rem 0; border-top: 1px solid var(--glass-border); font-size: .85rem; }
+.me-row { display: flex; gap: .6rem; align-items: center; min-width: 0; }
 .me p { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.me-photo { position: relative; flex: none; padding: 0; border-radius: 12px; background: none; }
+.me-photo:hover { transform: scale(1.06); }
+.me-photo-edit {
+  position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  font-size: .62rem; background: var(--grad); color: var(--on-accent); box-shadow: 0 2px 8px rgb(0 0 0 / .35); transition: transform var(--t) var(--spring);
+}
+.me-photo:hover .me-photo-edit { transform: scale(1.2) rotate(-12deg); }
+.me-actions { display: flex; flex-wrap: wrap; gap: .2rem .8rem; padding-left: .1rem; }
+.link-btn { border: 0; background: none; padding: .15rem 0; font-size: .78rem; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: transparent; transition: color var(--t-fast), text-decoration-color var(--t-fast); }
+.link-btn:hover { color: var(--fg); text-decoration-color: currentColor; }
+.link-btn.danger { color: var(--error); }
+.link-btn.danger.confirm { font-weight: 700; animation: shake .4s var(--ease); }
 .me-label { display: block; color: var(--muted); font-size: .75rem; }
 .badge { margin-left: .4rem; background: var(--grad); color: var(--on-accent); border-radius: 6px; padding: .05rem .4rem; font-size: .7rem; font-weight: 700; vertical-align: middle; }
 
@@ -286,6 +299,8 @@ body:has(#app:not([hidden])) .fab { display: none; } /* the chat has its own but
   box-shadow: inset 0 1px 0 rgb(255 255 255 / .25), 0 6px 16px -6px rgb(0 0 0 / .5); text-transform: uppercase;
 }
 .avatar.sm { width: 26px; height: 26px; border-radius: 9px; font-size: .75rem; }
+img.avatar { object-fit: cover; background: var(--field); animation: pop-in .4s var(--spring); }
+@keyframes pop-in { from { opacity: 0; transform: scale(.7); } }
 .a0 { background: linear-gradient(135deg, #7c3aed, #4338ca); }
 .a1 { background: linear-gradient(135deg, #c2410c, #9f1239); }
 .a2 { background: linear-gradient(135deg, #047857, #0e7490); }
@@ -349,6 +364,18 @@ body:has(#app:not([hidden])) .fab { display: none; } /* the chat has its own but
 .line.mine.enter { animation-name: msg-in-mine; }
 @keyframes msg-in { from { opacity: 0; transform: translateY(14px) scale(.97); } }
 @keyframes msg-in-mine { from { opacity: 0; transform: translateX(22px) scale(.97); } }
+/* delete your own messages */
+.del {
+  position: absolute; top: .2rem; right: .4rem; border: 1px solid var(--glass-border); border-radius: 9px; padding: .1rem .45rem;
+  background: var(--glass-strong); color: var(--fg); font-size: .78rem; opacity: 0; transform: translateY(-3px) scale(.95);
+  transition: opacity var(--t-fast), transform var(--t) var(--spring), background var(--t-fast);
+}
+.line:hover .del, .line:focus-within .del, .del.confirm { opacity: 1; transform: none; }
+.del.confirm { background: var(--error); color: #fff; border-color: transparent; font-weight: 650; }
+.del:disabled { opacity: .5; cursor: progress; }
+@media (hover: none) { .del { opacity: .8; transform: none; } }
+.line.gone { animation: line-out .38s var(--ease) forwards; pointer-events: none; }
+@keyframes line-out { to { opacity: 0; transform: translateX(-24px) scale(.96); filter: blur(3px); } }
 .line a { color: var(--accent); text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size var(--t) var(--ease); }
 .line a:hover { background-size: 100% 1px; }
 .n0 { color: var(--n0); } .n1 { color: var(--n1); } .n2 { color: var(--n2); } .n3 { color: var(--n3); }

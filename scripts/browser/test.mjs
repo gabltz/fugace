@@ -231,6 +231,58 @@ const texts = (page) => page.$$eval('#messages .line .text', (els) => els.map((e
   await axe(cpage, 'login (light)');
   await calm.close();
 
+  // v0.3: delete your own message; another web user sees it disappear.
+  await page.fill('#input', 'please delete me');
+  await page.press('#input', 'Enter');
+  await mpage.waitForFunction(() => [...document.querySelectorAll('#messages .text')].some((e) => e.textContent === 'please delete me'), null, { timeout: 5000 });
+  const mineLine = page.locator('#messages li.line', { hasText: 'please delete me' });
+  await mineLine.hover();
+  await mineLine.locator('.del').click();
+  await mineLine.locator('.del').click();
+  await mpage.waitForFunction(() => ![...document.querySelectorAll('#messages .text')].some((e) => e.textContent === 'please delete me'), null, { timeout: 5000 })
+    .then(() => ok('own message deleted, gone for the other web user'), () => fail('redaction not applied'));
+  const othersDel = await page.$$eval('#messages li.line', (ls) => ls.filter((l) => l.textContent.includes('hello from irc') && l.querySelector('.del')).length);
+  if (othersDel) fail('delete button offered on someone else\'s message');
+  else ok('no delete button on other people\'s messages');
+
+  // v0.3: profile picture, seen by the other user.
+  await page.setInputFiles('#avatar-file', { name: 'me.jpg', mimeType: 'image/jpeg', buffer: PHOTO });
+  await mpage.waitForFunction(() => [...document.querySelectorAll('#members img.avatar')].some((i) => i.complete && i.naturalWidth === 128), null, { timeout: 8000 })
+    .then(() => ok('profile picture shown to the other user'), () => fail('profile picture not shown'));
+
+  // v0.3: the login button does not chase the pointer any more.
+  const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true });
+  const lpage = await fresh.newPage();
+  watch(lpage, sink);
+  await lpage.goto(BASE);
+  await lpage.waitForTimeout(1200);
+  const btn = lpage.locator('#login-form button[type=submit]');
+  const box0 = await btn.boundingBox();
+  for (const [dx, dy] of [[-200, -60], [120, 40], [0, -90], [210, 70]]) {
+    await lpage.mouse.move(box0.x + box0.width / 2 + dx, box0.y + box0.height / 2 + dy, { steps: 6 });
+  }
+  await lpage.waitForTimeout(300);
+  const box1 = await btn.boundingBox();
+  if (Math.abs(box1.x - box0.x) < 1 && Math.abs(box1.y - box0.y) < 1) ok('login button stays put under pointer moves');
+  else fail(`login button moved by ${box1.x - box0.x},${box1.y - box0.y}`);
+
+  // v0.3: clear account wipes messages for others and this browser's memory.
+  await lpage.fill('#nick', 'eraser');
+  await lpage.click('label.check'); // the styled switch, as a user would
+  await lpage.click('#login-form button[type=submit]');
+  await lpage.waitForFunction(() => document.getElementById('buffer-name').textContent === '#general', null, { timeout: 5000 });
+  await lpage.fill('#input', 'trace to erase');
+  await lpage.press('#input', 'Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('#messages .text')].some((e) => e.textContent === 'trace to erase'), null, { timeout: 5000 });
+  await lpage.click('#clear-account');
+  await lpage.click('#clear-account');
+  await lpage.waitForFunction(() => !document.getElementById('login').hidden, null, { timeout: 5000 });
+  const storage = await lpage.evaluate(() => ['fugace.nick', 'fugace.key', 'fugace.avatar'].filter((k) => localStorage.getItem(k) !== null));
+  await page.waitForFunction(() => ![...document.querySelectorAll('#messages .text')].some((e) => e.textContent === 'trace to erase'), null, { timeout: 5000 })
+    .then(() => (storage.length ? fail('browser still remembers ' + storage.join(', ')) : ok('clear account: messages gone for others, browser memory wiped, back to login')),
+      () => fail('cleared messages still visible to others'));
+  await fresh.close();
+
   // Reload: same conversation comes back from the server history.
   await page.reload();
   await login(page, 'webuser3');
