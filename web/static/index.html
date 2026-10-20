@@ -67,7 +67,7 @@
     </details>
     <label class="check"><input id="remember" type="checkbox"><span class="switch" aria-hidden="true"></span> Se souvenir du pseudo sur cet appareil</label>
     <p id="login-error" class="error" role="alert" hidden></p>
-    <button class="btn primary magnetic" type="submit"><span>Entrer</span>
+    <button class="btn primary" type="submit"><span>Entrer</span>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
   </form>
@@ -84,8 +84,19 @@
       <ul id="queries" class="buffers"></ul>
     </div>
     <div class="me">
-      <span id="me-avatar" class="avatar" aria-hidden="true"></span>
-      <p><span class="me-label">Connecté en tant que</span> <strong id="me-nick"></strong><span id="me-admin" class="badge" hidden>admin</span></p>
+      <div class="me-row">
+        <button id="me-photo" class="me-photo btn" type="button" aria-label="Choisir une photo de profil" title="Choisir une photo de profil">
+          <span id="me-avatar" class="avatar" aria-hidden="true"></span>
+          <span class="me-photo-edit" aria-hidden="true">✎</span>
+        </button>
+        <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+        <p><span class="me-label">Connecté en tant que</span> <strong id="me-nick"></strong><span id="me-admin" class="badge" hidden>admin</span></p>
+      </div>
+      <div class="me-actions">
+        <button id="avatar-remove" class="link-btn" type="button" hidden>Retirer la photo</button>
+        <button id="clear-account" class="link-btn danger" type="button" aria-describedby="clear-hint">Effacer mon compte</button>
+        <span id="clear-hint" class="sr-only">Supprime vos messages, vos fichiers et votre photo, efface ce que ce navigateur a mémorisé, puis vous déconnecte.</span>
+      </div>
     </div>
   </nav>
   <main class="chat glass" aria-labelledby="buffer-name">

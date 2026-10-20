@@ -12,8 +12,8 @@ import (
 )
 
 // MaxClientBytes is the size budget of the web client, embedded font
-// included (SPEC §8, ADR 0010).
-const MaxClientBytes = 128 << 10
+// included (SPEC §8, ADR 0010, raised by ADR 0012).
+const MaxClientBytes = 160 << 10
 
 func embedded(t *testing.T) *Static {
 	t.Helper()

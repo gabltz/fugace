@@ -12,22 +12,45 @@
   const CHUNK_BYTES = 350; // text bytes per PRIVMSG, well under 512 with the prefix
   const BACKOFF = [1, 2, 5, 10, 30];
   const STORAGE_KEY = 'fugace.nick';
-  const WANTED_CAPS = ['server-time', 'echo-message'];
+  const KEY_STORAGE = 'fugace.key'; // identity secret: lets you delete your own messages later
+  const AVATAR_STORAGE = 'fugace.avatar';
+  const WANTED_CAPS = ['server-time', 'echo-message', 'message-tags', 'draft/message-redaction', 'fugace/avatar'];
+  const AVATAR_PX = 256; // resized in the browser before upload
+  const CONFIRM_MS = 3500;
   const UPLOAD_TOKEN = 'fugace/UPLOAD=';
   // Only our own re-encoded images get an inline preview (anti-tracking).
   const PREVIEW_RE = /^\/f\/[A-Za-z0-9_-]{22}\/[^/]+\.(jpg|png|gif)$/;
   const LIVE_MS = 5000; // lines younger than this are animated
   const GROUP_MS = 5 * 60 * 1000; // consecutive lines of one author group together
   const SPARKS = 18;
+  const MAGNET_RADIUS = 70; // px around a magnetic button
+  const MAGNET_MAX = 6; // px of displacement at most
 
   const st = {
     ws: null, nick: '', wantNick: '', serverPass: '', adminPass: '',
     registered: false, everRegistered: false, admin: false, closing: false,
     retry: 0, timer: null, buffers: new Map(), active: SERVER,
     channels: new Set(['#general']), focusNext: '#general', uploadToken: '', shownMembers: new Map(),
+    avatars: new Map(), // folded nick -> picture version
+    clearing: false,
   };
 
   const fold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+
+  function stored(k) { try { return localStorage.getItem(k); } catch { return null; } }
+  function store(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* storage disabled */ } }
+
+  // A random secret kept in this browser. The server only keeps a keyed
+  // hash of it, which makes your messages yours across reconnections.
+  function identityKey() {
+    let k = stored(KEY_STORAGE);
+    if (!k || !/^[A-Za-z0-9_-]{32,128}$/.test(k)) {
+      const b = crypto.getRandomValues(new Uint8Array(32));
+      k = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      store(KEY_STORAGE, k);
+    }
+    return k;
+  }
   const nickOf = (src) => src.split('!')[0];
   const clean = (s) => s.replace(/[\r\n\0]/g, ' ');
 
@@ -116,7 +139,7 @@
   }
 
   function add(b, kind, text, opts = {}) {
-    const l = { kind, text, nick: opts.nick || '', at: opts.at || new Date() };
+    const l = { kind, text, nick: opts.nick || '', at: opts.at || new Date(), msgid: opts.msgid || '', own: Boolean(opts.own), target: b.name };
     if (opts.nick && st.nick && fold(opts.nick) !== fold(st.nick) && mentions(text)) l.kind += ' mention';
     if (opts.nick && st.nick && fold(opts.nick) === fold(st.nick)) l.mine = true;
     const prev = b.lines[b.lines.length - 1];
@@ -171,10 +194,36 @@
   }
   const nickClass = (nick) => 'nick n' + hue(nick);
 
-  function avatar(nick, small) {
+  function initialAvatar(nick, small) {
     const a = el('span', 'avatar a' + hue(nick) + (small ? ' sm' : ''), (nick.match(/[A-Za-z0-9]/) || [nick[0] || '?'])[0]);
     a.setAttribute('aria-hidden', 'true');
+    a.dataset.av = fold(nick);
+    if (small) a.dataset.small = '1';
     return a;
+  }
+
+  // A profile picture if the user has one (served to connected users only,
+  // hence the token), otherwise the initial on a gradient.
+  function avatar(nick, small) {
+    const v = st.avatars.get(fold(nick));
+    if (!v || !st.uploadToken) return initialAvatar(nick, small);
+    const img = el('img', 'avatar photo' + (small ? ' sm' : ''));
+    img.alt = '';
+    img.decoding = 'async';
+    img.dataset.av = fold(nick);
+    if (small) img.dataset.small = '1';
+    img.src = '/avatar/' + encodeURIComponent(nick) + '?v=' + v + '&t=' + encodeURIComponent(st.uploadToken);
+    img.addEventListener('error', () => img.replaceWith(initialAvatar(nick, small)), { once: true });
+    return img;
+  }
+
+  // Re-renders every avatar of nick on screen.
+  function refreshAvatars(nick) {
+    for (const old of document.querySelectorAll('[data-av="' + CSS.escape(fold(nick)) + '"]')) {
+      const fresh = avatar(nick, old.dataset.small === '1');
+      if (old.id) fresh.id = old.id;
+      old.replaceWith(fresh);
+    }
   }
 
   function formatTime(d) {
@@ -240,6 +289,7 @@
       prev.at.toDateString() === l.at.toDateString() && l.at - prev.at < GROUP_MS && prev.kind.split(' ')[0] === l.kind.split(' ')[0];
     const talk = isTalk(l);
     const li = el('li', 'line ' + l.kind + (talk ? (grouped ? ' cont' : ' first') : '') + (l.mine ? ' mine' : ''));
+    if (l.msgid) li.dataset.msgid = l.msgid;
     const t = el('time', '', formatTime(l.at));
     t.dateTime = l.at.toISOString();
     const text = el('span', 'text');
@@ -255,8 +305,51 @@
     } else {
       li.append(text, t);
     }
+    if (l.own && l.msgid) li.append(deleteButton(l));
     nodes.push(li);
     return nodes;
+  }
+
+  // Your own messages get a delete button: first click asks, second deletes.
+  function deleteButton(l) {
+    const btn = el('button', 'del', '🗑');
+    btn.type = 'button';
+    btn.title = 'Supprimer ce message';
+    btn.setAttribute('aria-label', 'Supprimer ce message');
+    let timer = 0;
+    btn.addEventListener('click', () => {
+      if (!btn.classList.contains('confirm')) {
+        btn.classList.add('confirm');
+        btn.textContent = 'Supprimer ?';
+        timer = setTimeout(() => { btn.classList.remove('confirm'); btn.textContent = '🗑'; }, CONFIRM_MS);
+        return;
+      }
+      clearTimeout(timer);
+      btn.disabled = true;
+      send('REDACT ' + l.target + ' ' + l.msgid);
+    });
+    return btn;
+  }
+
+  // Removes a redacted line from its conversation.
+  function redact(b, msgid) {
+    const i = b.lines.findIndex((l) => l.msgid === msgid);
+    if (i < 0) return;
+    b.lines.splice(i, 1);
+    if (b.key !== st.active) return;
+    const li = document.querySelector('#messages li[data-msgid="' + CSS.escape(msgid) + '"]');
+    const rerender = () => {
+      const list = $('messages');
+      const top = list.scrollTop;
+      list.replaceChildren(...renderLines(b.lines));
+      list.scrollTop = top;
+    };
+    if (li && motion()) {
+      li.classList.add('gone');
+      li.addEventListener('animationend', rerender, { once: true });
+    } else {
+      rerender();
+    }
   }
 
   function renderLines(lines) {
@@ -380,6 +473,7 @@
     st.ws = ws;
     ws.addEventListener('open', () => {
       send('CAP LS 302');
+      send('KEY ' + identityKey());
       if (st.serverPass) send('PASS :' + st.serverPass);
       send('NICK ' + st.wantNick);
       send('USER web 0 * :web');
@@ -392,6 +486,7 @@
     ws.addEventListener('close', () => {
       if (st.ws !== ws) return;
       st.ws = null;
+      if (st.clearing) { finishClear(); return; }
       if (st.closing) { status('Déconnecté.'); return; }
       if (!st.everRegistered) { showLogin(st.loginError || 'Connexion impossible.'); return; }
       const delay = BACKOFF[Math.min(st.retry, BACKOFF.length - 1)] * (0.8 + Math.random() * 0.4);
@@ -411,6 +506,7 @@
     $('me-nick').textContent = nick;
     $('me-avatar').replaceWith(Object.assign(avatar(nick), { id: 'me-avatar' }));
     $('login').hidden = true;
+    st.clearing = false;
     $('app').hidden = false;
     if (st.adminPass) send('OPER admin :' + st.adminPass);
     send('JOIN ' + [...st.channels].join(','));
@@ -477,8 +573,30 @@
         }
         return;
       case 'PRIVMSG': case 'NOTICE': return onMessage(m, from, self, at);
+      case 'REDACT': {
+        const target = p[0] || '';
+        let b;
+        if (target.startsWith('#')) b = st.buffers.get(fold(target));
+        else b = st.buffers.get(fold(st.nick && fold(target) === fold(st.nick) ? from : target));
+        if (b) redact(b, p[1] || '');
+        return;
+      }
+      case 'AVATAR': {
+        const v = Number(p[0]) || 0;
+        if (v > 0) st.avatars.set(fold(from), v); else st.avatars.delete(fold(from));
+        if (self) $('avatar-remove').hidden = v === 0;
+        refreshAvatars(from);
+        return;
+      }
+      case 'FAIL':
+        if (p[0] === 'REDACT') {
+          for (const b of document.querySelectorAll('.del[disabled]')) b.disabled = false;
+          return info(p[p.length - 1] || 'Suppression impossible.', 'error');
+        }
+        return info((p[0] || '') + ' : ' + (p[p.length - 1] || ''), 'error');
       case '005':
         for (const tok of p.slice(1, -1)) if (tok.startsWith(UPLOAD_TOKEN)) st.uploadToken = tok.slice(UPLOAD_TOKEN.length);
+        if (st.uploadToken) restoreAvatar();
         return;
       case '002': case '003': case '004': case '251': case '254': case '255': case '422': return;
       default:
@@ -551,6 +669,8 @@
   }
 
   function onNick(from, to, self, at) {
+    const pic = st.avatars.get(fold(from));
+    if (pic) { st.avatars.delete(fold(from)); st.avatars.set(fold(to), pic); }
     if (self) {
       st.nick = to;
       st.wantNick = to;
@@ -593,7 +713,7 @@
     let b;
     if (target.startsWith('#')) b = buffer(target, 'channel');
     else b = buffer(self ? target : from, 'query');
-    add(b, kind, text, { nick: from, at });
+    add(b, kind, text, { nick: from, at, msgid: m.tags.msgid, own: 'fugace/own' in m.tags });
   }
 
   // --- user input -------------------------------------------------------
@@ -607,6 +727,8 @@
     '/close : fermer la conversation privée courante',
     '/quit [message] : se déconnecter',
     'Fichiers : bouton 📎, glisser-déposer ou coller une image (1 h, puis effacés)',
+    'Vos messages : survolez-les puis 🗑 pour les supprimer ; photo de profil : cliquez sur votre avatar en bas à gauche',
+    '/clear-account : supprime vos messages, fichiers et photo, oublie ce navigateur, puis déconnecte',
     'Admin : /oper motdepasse, /join #nouveau (création), /delchan [#salon], /clearhistory [#salon]',
   ];
 
@@ -682,6 +804,8 @@
         if (ch) send('CLEARHISTORY ' + ch);
         return;
       }
+      case 'clear-account':
+        return clearAccount();
       case 'help':
         for (const h of HELP) info(h);
         return;
@@ -787,9 +911,11 @@
           const r = m.getBoundingClientRect();
           const dx = e.clientX - (r.left + r.width / 2);
           const dy = e.clientY - (r.top + r.height / 2);
-          const near = Math.hypot(dx, dy) < Math.max(r.width, r.height);
-          m.style.setProperty('--tx', near ? dx * 0.18 + 'px' : '0px');
-          m.style.setProperty('--ty', near ? dy * 0.18 + 'px' : '0px');
+          // A small radius and a few pixels at most: a nudge, not a chase.
+          const near = Math.hypot(dx, dy) < MAGNET_RADIUS;
+          const clamp = (v) => Math.max(-MAGNET_MAX, Math.min(MAGNET_MAX, v * 0.15));
+          m.style.setProperty('--tx', near ? clamp(dx) + 'px' : '0px');
+          m.style.setProperty('--ty', near ? clamp(dy) + 'px' : '0px');
         }
       });
     });
@@ -870,6 +996,109 @@
     box.addEventListener('click', (e) => { if (e.target === box) box.close(); });
   }
 
+  // --- profile picture and account -------------------------------------
+  function dataURLToBlob(url) {
+    const [head, b64] = url.split(',');
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: head.slice(5, head.indexOf(';')) });
+  }
+
+  function sendAvatar(blob) {
+    if (!st.uploadToken) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/avatar');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + st.uploadToken);
+      xhr.addEventListener('loadend', () => resolve(xhr.status === 201));
+      xhr.send(blob);
+    });
+  }
+
+  // Square-crops and resizes in the browser, so that a big photo travels as
+  // a few kilobytes; the server cleans and re-encodes it again.
+  async function resizeImage(file) {
+    const bitmap = await createImageBitmap(file);
+    const side = Math.min(bitmap.width, bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = AVATAR_PX;
+    canvas.getContext('2d').drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
+    bitmap.close();
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+  }
+
+  async function chooseAvatar(file) {
+    let blob;
+    try { blob = await resizeImage(file); } catch { blob = null; }
+    if (!blob) return info('Cette image ne peut pas servir de photo de profil.', 'error');
+    if (!(await sendAvatar(blob))) return info('Échec de l’envoi de la photo.', 'error');
+    burst($('me-photo'));
+    const reader = new FileReader();
+    reader.addEventListener('load', () => store(AVATAR_STORAGE, String(reader.result)));
+    reader.readAsDataURL(blob); // remembered here, re-sent at each connection
+  }
+
+  function restoreAvatar() {
+    const saved = stored(AVATAR_STORAGE);
+    if (saved && saved.startsWith('data:image/')) {
+      try { sendAvatar(dataURLToBlob(saved)); } catch { store(AVATAR_STORAGE, null); }
+    }
+  }
+
+  function removeAvatar() {
+    store(AVATAR_STORAGE, null);
+    if (!st.uploadToken) return;
+    const xhr = new XMLHttpRequest();
+    xhr.open('DELETE', '/avatar');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + st.uploadToken);
+    xhr.send();
+  }
+
+  function clearAccount() {
+    st.clearing = true;
+    st.closing = true;
+    send('CLEAR-ACCOUNT');
+  }
+
+  // After CLEAR-ACCOUNT: forget everything this browser knows, back to login.
+  function finishClear() {
+    for (const k of [STORAGE_KEY, KEY_STORAGE, AVATAR_STORAGE]) store(k, null);
+    st.buffers.clear();
+    st.avatars.clear();
+    st.channels = new Set(['#general']);
+    st.focusNext = '#general';
+    st.active = SERVER;
+    $('nick').value = '';
+    $('remember').checked = false;
+    $('messages').replaceChildren();
+    showLogin('Compte effacé : vos messages, fichiers et photo ont été supprimés, et ce navigateur a tout oublié.');
+  }
+
+  function setupAccount() {
+    $('me-photo').addEventListener('click', () => $('avatar-file').click());
+    $('avatar-file').addEventListener('change', () => {
+      const f = $('avatar-file').files[0];
+      $('avatar-file').value = '';
+      if (f) chooseAvatar(f);
+    });
+    $('avatar-remove').addEventListener('click', removeAvatar);
+    const clear = $('clear-account');
+    let timer = 0;
+    clear.addEventListener('click', () => {
+      if (!clear.classList.contains('confirm')) {
+        clear.classList.add('confirm');
+        clear.textContent = 'Confirmer l’effacement';
+        timer = setTimeout(() => { clear.classList.remove('confirm'); clear.textContent = 'Effacer mon compte'; }, CONFIRM_MS);
+        return;
+      }
+      clearTimeout(timer);
+      clear.classList.remove('confirm');
+      clear.textContent = 'Effacer mon compte';
+      clearAccount();
+    });
+  }
+
   // --- login ------------------------------------------------------------
   function showLogin(error) {
     $('app').hidden = true;
@@ -917,6 +1146,7 @@
     $('login-form').addEventListener('submit', submitLogin);
     $('input-form').addEventListener('submit', submitInput);
     setupUploads();
+    setupAccount();
     setupEffects();
     setupAppearance();
     setupLightbox();
