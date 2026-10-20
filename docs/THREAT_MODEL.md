@@ -41,12 +41,16 @@
 | T18 | A1 abuse du handler `http-01` | Ne répond qu'aux jetons en cours, réponse de taille fixe | Test unitaire — `TestHTTPChallenge` |
 | T19 | A2 crée/supprime des salons ou vide l'historique sans être admin, ou devine le mot de passe admin ou serveur | Commandes réservées à `OPER`, comparaison temps constant, délai de 2 s par échec, déconnexion après 5 échecs `OPER` ou 1 `PASS` | Tests unitaires OPER/DELCHAN/CLEARHISTORY — `TestAdmin`, `TestOperBruteForceDisconnects`, `TestNoAdminConfigured`, `TestServerPassword`, `TestWSServerPassword` |
 | T20 | A2 épuise la RAM via l'historique | Budget global `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien, rate-limit des messages | Test unitaire du budget — `TestHistoryBudget`, `TestHistoryDisabledAndOversized` |
+| T21 | A2 supprime ou fait disparaître les messages d'un autre | `REDACT` et `CLEAR-ACCOUNT` réservés à l'identité de l'auteur (empreinte HMAC d'une clé de 256 bits, `KEY` interdit après l'enregistrement), pas de pouvoir de suppression pour l'admin | `TestRedactChannel`, `TestRedactPrivate`, `TestKeyRules`, `scripts/browser/run.sh` (pas de bouton sur les messages des autres) |
+| T22 | A1 énumère ou héberge des images via les photos de profil | Photos réservées aux connectés (jeton exigé), une par identité, 2048 au plus, pipeline image complet, 128 × 128, supprimées à la déconnexion | `TestAvatarHandlers`, `TestMakeAvatar`, `FuzzMakeAvatar`, `TestAvatarNotifications` |
+| T23 | A5 retrouve qui a écrit quoi via l'identité d'auteur | Seule une empreinte HMAC (clé de démarrage en RAM) est gardée, jamais la clé ni une IP ; « Clear account » efface messages, fichiers, photo et la clé du navigateur | `TestClearAccount`, `TestKeyRules`, `scripts/browser/run.sh` (Clear account) |
 
 ## Limites assumées (à écrire dans le README)
 
 - « No-log » côté serveur ne contrôle pas les clients : la plupart des clients IRC journalisent localement par défaut.
 - Le port 6667 est en clair.
-- Tant que le conteneur tourne, la RAM contient les fichiers de l'heure écoulée et l'historique des salons depuis le démarrage ; un root sur l'hôte peut la lire.
+- Tant que le conteneur tourne, la RAM contient les fichiers de l'heure écoulée, l'historique des salons depuis le démarrage et les photos des personnes connectées ; un root sur l'hôte peut la lire.
+- Supprimer un message ne l'efface pas chez les clients IRC qui l'ont déjà affiché (ni de leurs journaux locaux) : seul l'historique du serveur et les clients compatibles l'oublient.
 - Aucun reverse proxy n'est nécessaire. Si on en met un quand même (`FUGACE_TLS=off`), il doit avoir `access_log off`, sinon les IP et URLs de fichiers y sont journalisées.
 - Sans `FUGACE_HOST`, le certificat est autosigné : avertissement navigateur, et un attaquant en position de MITM pourrait s'interposer si l'utilisateur accepte aveuglément l'avertissement.
 - Les certificats émis apparaissent dans les journaux Certificate Transparency publics (le domaine ou l'IP est donc publiquement associé à un service TLS).

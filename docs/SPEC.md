@@ -63,6 +63,8 @@ Les clients qui se connectent par IP n'envoient pas de SNI : le `GetCertificate`
 - **Salons** : préfixe `#`, longueur max 32, ASCII imprimable. Créés uniquement par l'admin (en les rejoignant) ou au démarrage (`FUGACE_CHANNELS`), persistants même vides. Topic modifiable par tout membre. L'admin (`OPER`) apparaît `@` partout (`PREFIX=(o)@`) ; aucun autre opérateur.
 - **Salon par défaut** : `#general`, rejoint automatiquement par les clients web.
 - **Messages privés** : `PRIVMSG nick :...` supportés.
+- **Identité d'auteur** : le client web envoie une clé secrète gardée dans le navigateur (`KEY`), dont le serveur ne garde qu'une empreinte en RAM. Sans clé, l'identité est propre à la connexion. Elle sert uniquement à reconnaître ses propres messages, fichiers et photo (ADR 0012).
+- **Suppression** : chacun peut supprimer ses propres messages (`REDACT`, IRCv3 `draft/message-redaction`), y compris dans l'historique ; « Clear account » (`CLEAR-ACCOUNT`) efface tous ses messages, fichiers et sa photo, puis déconnecte.
 - **Historique** : chaque salon garde en RAM tous ses messages depuis le démarrage (budget `FUGACE_HISTORY_MAX_MB`, éviction du plus ancien), rejoués à chaque JOIN. Rien pour les messages privés. L'admin peut vider l'historique (`CLEARHISTORY`) ou supprimer le salon (`DELCHAN`).
 
 ## 5. Compatibilité IRC (RFC 1459 / 2812, sous-ensemble + IRCv3 léger)
@@ -71,7 +73,7 @@ Les clients qui se connectent par IP n'envoient pas de SNI : le `GetCertificate`
 
 | Commande | Comportement attendu |
 |----------|----------------------|
-| `CAP LS [302]`, `CAP REQ`, `CAP END`, `CAP LIST` | Caps annoncées : `echo-message`, `server-time`, `message-tags` (minimal). Enregistrement suspendu tant que `CAP END` n'est pas reçu si `CAP LS` a été envoyé |
+| `CAP LS [302]`, `CAP REQ`, `CAP END`, `CAP LIST` | Caps annoncées : `echo-message`, `server-time`, `message-tags`, `draft/message-redaction`, `fugace/avatar`. Enregistrement suspendu tant que `CAP END` n'est pas reçu si `CAP LS` a été envoyé |
 | `PASS` | Uniquement si un mot de passe serveur optionnel est défini (§7) |
 | `NICK`, `USER` | Enregistrement → `001`–`004`, `005` (ISUPPORT), `422` (pas de MOTD) ou MOTD court |
 | `PING` / `PONG` | Les deux sens. Ping serveur toutes les 90 s, coupure à 180 s sans réponse |
@@ -84,6 +86,9 @@ Les clients qui se connectent par IP n'envoient pas de SNI : le `GetCertificate`
 | `MOTD`, `LUSERS`, `VERSION`, `TIME` | Réponses minimales |
 | `OPER` | Authentification admin par `FUGACE_ADMIN_PASSWORD` |
 | `DELCHAN`, `CLEARHISTORY` | Admin uniquement : supprimer un salon, vider son historique |
+| `KEY <clé>` | Avant l'enregistrement : identité d'auteur stable (client web) |
+| `REDACT <cible> <msgid> [:raison]` | Supprimer un de ses propres messages (salon ou privé) |
+| `CLEAR-ACCOUNT` | Supprimer tous ses messages, fichiers et sa photo, puis se déconnecter |
 | Inconnue | `421 ERR_UNKNOWNCOMMAND` |
 
 ### 5.2 ISUPPORT (005) minimal
@@ -131,6 +136,11 @@ plus le jeton vendeur d'upload (§6.2).
 
 Les messages CTCP `DCC` sont rejetés avec une NOTICE explicative : DCC révèle l'IP des participants, contraire à l'objectif de confidentialité.
 
+### 6.6 Photo de profil
+
+- `POST /avatar` (jeton d'envoi) : image nettoyée comme un fichier, recadrée en 128 × 128 JPEG, une par identité, en RAM, supprimée à la dernière déconnexion ; `DELETE /avatar` la retire.
+- `GET /avatar/{nick}?t=<jeton>` : réservé aux personnes connectées. Les clients ayant `fugace/avatar` reçoivent `AVATAR <version>` à l'arrivée dans un salon et à chaque changement.
+
 ## 7. Configuration (toute optionnelle)
 
 Tout fonctionne sans aucune variable. Surcharges possibles :
@@ -159,7 +169,7 @@ Validation stricte au démarrage : valeur invalide → message d'erreur clair et
 
 ## 8. Client web
 
-- HTML/CSS/JS **vanilla**, sans framework, sans étape de build, sans npm, embarqué via `go:embed`. Poids ≤ 128 Ko, police Inter embarquée comprise (ADR 0010).
+- HTML/CSS/JS **vanilla**, sans framework, sans étape de build, sans npm, embarqué via `go:embed`. Poids ≤ 160 Ko, police Inter embarquée comprise (ADR 0010, 0012).
 - Parle IRC sur WebSocket (spec IRCv3 WebSocket, sous-protocole `text.ircv3.net`).
 - Écran d'accueil : un champ pseudo (+ mot de passe serveur si exigé). Le pseudo peut être mémorisé en `localStorage` côté navigateur (opt-in, case à cocher).
 - Interface : liste des salons et MP, zone de messages, liste des membres, champ de saisie avec commandes `/nick /join /part /msg /me /topic /quit /help`.

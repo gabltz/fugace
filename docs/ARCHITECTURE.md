@@ -89,6 +89,8 @@ scripts/                    smoke, clients IRC réels, navigateur, pebble (ACME)
 | `/ws` | GET (upgrade) | IRC sur WebSocket, sous-protocole `text.ircv3.net`, vérification `Origin` = même origine |
 | `/upload` | POST | Upload (jeton Bearer) |
 | `/f/{id}/{name}` | GET, DELETE | Lecture / suppression |
+| `/avatar` | POST, DELETE | Photo de profil de la connexion (jeton Bearer) |
+| `/avatar/{nick}` | GET | Photo d'un pseudo connecté, réservée aux connectés (`?t=<jeton>`) |
 | `/healthz` | GET | `200 ok`, aucune info (servi aussi sur HTTP sans redirection) |
 | `/.well-known/acme-challenge/{token}` | GET | Port HTTP uniquement, challenges ACME en cours |
 | tout le reste sur HTTP | * | `301` vers `https://<host><path>` (sauf `FUGACE_TLS=off`) |
