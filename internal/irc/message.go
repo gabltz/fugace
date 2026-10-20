@@ -124,7 +124,7 @@ func parseParams(rest string) []string {
 	}
 }
 
-// validCommand accepts letters only, or exactly three digits.
+// validCommand accepts letters (and inner hyphens), or exactly three digits.
 func validCommand(s string) bool {
 	if s == "" {
 		return false
@@ -132,9 +132,13 @@ func validCommand(s string) bool {
 	if len(s) == 3 && isDigit(s[0]) && isDigit(s[1]) && isDigit(s[2]) {
 		return true
 	}
+	// Letters, with inner hyphens allowed for vendor commands (CLEAR-ACCOUNT).
+	if s[0] == '-' || s[len(s)-1] == '-' {
+		return false
+	}
 	for i := range len(s) {
 		c := s[i]
-		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && c != '-' {
 			return false
 		}
 	}
