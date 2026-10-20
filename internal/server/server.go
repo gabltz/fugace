@@ -8,9 +8,17 @@ package server
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/netip"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gabltz/fugace/internal/irc"
@@ -32,6 +40,9 @@ const (
 	DefaultTickInterval        = 5 * time.Second
 	// OperFailureDelay slows down password guessing (OPER and server PASS).
 	OperFailureDelay = 2 * time.Second
+	// Sizes of the per-boot msgid prefix and of identity hashes.
+	msgPrefixBytes = 4
+	ownerBytes     = 16
 	// historyChunk bounds how many history entries are copied at once.
 	historyChunk = 128
 	// replyQueue is the capacity of the blocking queue used for replies to
@@ -109,12 +120,25 @@ type Options struct {
 	// Uploads issues the per-connection upload token announced in 005
 	// (fugace/UPLOAD); nil disables file sharing.
 	Uploads UploadTokens
+	// Account is optional; nil disables pictures and upload clean-up.
+	Account AccountHooks
 }
 
-// UploadTokens issues a token bound to one connection; revoke is called
-// when the connection ends.
+// UploadTokens issues a token bound to one connection and attributed to an
+// author identity; revoke is called when the connection ends.
 type UploadTokens interface {
-	Issue() (token string, revoke func(), err error)
+	Issue(owner string) (token string, revoke func(), err error)
+}
+
+// AccountHooks connects the chat core to what an author owns elsewhere
+// (files, profile picture). Identities are opaque keyed hashes.
+type AccountHooks interface {
+	// AvatarVersion returns the version of owner's picture, 0 if none.
+	AvatarVersion(owner string) int
+	// Cleared deletes everything owner uploaded (CLEAR-ACCOUNT).
+	Cleared(owner string)
+	// Gone is called when the last connection of owner ends.
+	Gone(owner string)
 }
 
 // UploadISupport is the vendor ISUPPORT token carrying the upload token.
@@ -126,6 +150,11 @@ type Server struct {
 	rates   Rates
 	conns   *limits.Conns
 	history *history
+	pms     *pmIndex
+
+	ownerKey  []byte        // per-boot HMAC key for identity keys
+	msgPrefix string        // per-boot msgid prefix
+	msgSeq    atomic.Uint64 // msgid counter
 
 	mu       sync.RWMutex
 	clients  map[*client]struct{}
@@ -173,14 +202,26 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	ownerKey := make([]byte, sha256.Size)
+	prefix := make([]byte, msgPrefixBytes)
+	if _, err := rand.Read(ownerKey); err != nil {
+		return nil, fmt.Errorf("server: random key: %w", err)
+	}
+	if _, err := rand.Read(prefix); err != nil {
+		return nil, fmt.Errorf("server: random prefix: %w", err)
+	}
 	s := &Server{
-		opts:     opts,
-		rates:    rates,
-		conns:    conns,
-		history:  newHistory(opts.HistoryMaxBytes),
-		clients:  make(map[*client]struct{}),
-		nicks:    make(map[string]*client),
-		channels: make(map[string]*channel),
+		opts:    opts,
+		rates:   rates,
+		conns:   conns,
+		history: newHistory(opts.HistoryMaxBytes),
+		pms:     newPMIndex(),
+
+		ownerKey:  ownerKey,
+		msgPrefix: base64.RawURLEncoding.EncodeToString(prefix),
+		clients:   make(map[*client]struct{}),
+		nicks:     make(map[string]*client),
+		channels:  make(map[string]*channel),
 	}
 	for _, name := range opts.Channels {
 		if !irc.ValidChannel(name) {
@@ -284,7 +325,17 @@ func (s *Server) disconnect(c *client, reason string) {
 		delete(c.channels, key)
 	}
 	mask := c.maskLocked()
+	last := true
+	for o := range s.clients {
+		if o.owner == c.owner {
+			last = false
+			break
+		}
+	}
 	s.mu.Unlock()
+	if last && s.opts.Account != nil {
+		s.opts.Account.Gone(c.owner)
+	}
 
 	s.fanout(nil, peers, irc.Message{Source: mask, Command: "QUIT", Params: []string{reason}})
 	if c.uploadRevoke != nil {
@@ -315,29 +366,33 @@ func (s *Server) peersLocked(c *client, self bool) []*client {
 	return out
 }
 
+// stamp carries the tags of a message: its time, and for chat messages
+// its msgid and author identity.
+type stamp struct {
+	at    time.Time
+	msgid string
+	owner string
+}
+
 // fanout sends msg to every recipient. actor, if among them, gets it on its
-// reply queue so that it stays ordered with its other replies. Serialization
-// happens at most twice (with and without server-time). Must not be called
-// with s.mu held.
+// reply queue so that it stays ordered with its other replies. Must not be
+// called with s.mu held.
 func (s *Server) fanout(actor *client, recips []*client, msg irc.Message) {
-	if len(recips) == 0 {
-		return
-	}
-	at := s.opts.Now()
-	var plain, tagged []byte
+	s.fanoutStamped(actor, recips, msg, stamp{at: s.opts.Now()})
+}
+
+// fanoutStamped adds, per recipient, the time tag (server-time), the msgid
+// (message-tags) and fugace/own for the author's own connections. Each
+// variant is serialized once.
+func (s *Server) fanoutStamped(actor *client, recips []*client, msg irc.Message, st stamp) {
+	var cache [8][]byte
+	var done [8]bool
 	for _, r := range recips {
-		var b []byte
-		if r.hasCap(capServerTime) {
-			if tagged == nil {
-				tagged = encode(withTime(msg, at))
-			}
-			b = tagged
-		} else {
-			if plain == nil {
-				plain = encode(msg)
-			}
-			b = plain
+		v := r.variant(st)
+		if !done[v] {
+			cache[v], done[v] = encode(tagged(msg, st, v)), true
 		}
+		b := cache[v]
 		if b == nil {
 			continue
 		}
@@ -346,6 +401,109 @@ func (s *Server) fanout(actor *client, recips []*client, msg irc.Message) {
 		} else {
 			r.deliver(b)
 		}
+	}
+}
+
+// Tag variants, combined as bits.
+const (
+	varTime = 1 << iota
+	varTags
+	varOwn
+)
+
+func (c *client) variant(st stamp) int {
+	c.s.mu.RLock()
+	defer c.s.mu.RUnlock()
+	v := 0
+	if c.caps[capServerTime] {
+		v |= varTime
+	}
+	if c.caps[capMessageTags] {
+		v |= varTags
+		if st.owner != "" && st.owner == c.owner {
+			v |= varOwn
+		}
+	}
+	return v
+}
+
+// ownTag marks, for its author only, a message they can redact.
+const ownTag = "fugace/own"
+
+func tagged(m irc.Message, st stamp, v int) irc.Message {
+	var tags []irc.Tag
+	if v&varTime != 0 {
+		tags = append(tags, irc.Tag{Key: "time", Value: formatTime(st.at)})
+	}
+	if v&varTags != 0 && st.msgid != "" {
+		tags = append(tags, irc.Tag{Key: "msgid", Value: st.msgid})
+	}
+	if v&varOwn != 0 {
+		tags = append(tags, irc.Tag{Key: ownTag})
+	}
+	m.Tags = append(tags, m.Tags...)
+	return m
+}
+
+// newMsgID returns a unique message id for this boot.
+func (s *Server) newMsgID() string {
+	return s.msgPrefix + strconv.FormatUint(s.msgSeq.Add(1), 36)
+}
+
+// connOwner is the identity of a connection that sent no KEY.
+func connOwner() string {
+	b := make([]byte, ownerBytes)
+	_, _ = rand.Read(b) // crypto/rand.Read never fails on supported platforms
+	return "c" + hex.EncodeToString(b)
+}
+
+// keyOwner derives a stable identity from a client secret; only this keyed
+// hash is kept, and it changes with every boot.
+func (s *Server) keyOwner(key string) string {
+	mac := hmac.New(sha256.New, s.ownerKey)
+	mac.Write([]byte(key))
+	return "k" + hex.EncodeToString(mac.Sum(nil)[:ownerBytes])
+}
+
+// OwnerOf returns the identity behind a registered nick.
+func (s *Server) OwnerOf(nick string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c := s.nicks[irc.Fold(nick)]
+	if c == nil || !c.registered.Load() {
+		return "", false
+	}
+	return c.owner, true
+}
+
+// AvatarChanged tells the users sharing a channel with owner's connections
+// (and those connections) that the picture changed.
+func (s *Server) AvatarChanged(owner string) {
+	version := 0
+	if s.opts.Account != nil {
+		version = s.opts.Account.AvatarVersion(owner)
+	}
+	type send struct {
+		mask  string
+		peers []*client
+	}
+	var sends []send
+	s.mu.RLock()
+	for c := range s.clients {
+		if c.owner != owner || !c.registered.Load() {
+			continue
+		}
+		var peers []*client
+		for _, p := range s.peersLocked(c, true) {
+			if p.caps[capAvatar] {
+				peers = append(peers, p)
+			}
+		}
+		sends = append(sends, send{c.maskLocked(), peers})
+	}
+	s.mu.RUnlock()
+	for _, sd := range sends {
+		s.fanout(nil, sd.peers, irc.Message{Source: sd.mask, Command: "AVATAR", Params: []string{strconv.Itoa(version)}})
 	}
 }
 

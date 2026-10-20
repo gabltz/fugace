@@ -228,7 +228,7 @@ func TestCapNegotiation(t *testing.T) {
 	addr, _ := start(t, baseOpts())
 	c := dial(t, addr)
 	c.send("CAP LS 302", "NICK bob", "USER bob 0 * :b")
-	c.expect("CAP * LS :echo-message message-tags server-time")
+	c.expect("CAP * LS :draft/message-redaction echo-message fugace/avatar message-tags server-time")
 	c.expectNone(" 001 ", 200*time.Millisecond) // suspended until CAP END
 	c.send("CAP REQ :server-time unknown-cap")
 	c.expect("CAP bob NAK :server-time unknown-cap")

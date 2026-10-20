@@ -16,10 +16,14 @@ const (
 	capEchoMessage = "echo-message"
 	capMessageTags = "message-tags"
 	capServerTime  = "server-time"
+	capRedaction   = "draft/message-redaction"
+	capAvatar      = "fugace/avatar"
 )
 
 // supportedCaps returns the offered capabilities, in CAP LS order.
-func supportedCaps() [3]string { return [...]string{capEchoMessage, capMessageTags, capServerTime} }
+func supportedCaps() [5]string {
+	return [...]string{capRedaction, capEchoMessage, capAvatar, capMessageTags, capServerTime}
+}
 
 func isSupportedCap(name string) bool {
 	for _, c := range supportedCaps() {
@@ -38,6 +42,7 @@ type client struct {
 	kind Kind
 
 	nick     string              // (mu)
+	owner    string              // author identity: random per connection, or derived from KEY before registration
 	oper     bool                // (mu)
 	caps     map[string]bool     // (mu)
 	channels map[string]*channel // (mu) folded name -> channel
@@ -79,6 +84,7 @@ func newClient(s *Server, conn Conn, info ConnInfo) *client {
 		kind:        info.Kind,
 		caps:        make(map[string]bool),
 		channels:    make(map[string]*channel),
+		owner:       connOwner(),
 		connectedAt: now,
 		msgBucket:   limits.NewBucket(s.rates.Message.Burst, s.rates.Message.Interval),
 		joinBucket:  limits.NewBucket(s.rates.Join.Burst, s.rates.Join.Interval),

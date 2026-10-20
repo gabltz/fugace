@@ -30,6 +30,14 @@ type Options struct {
 	Static *Static      // web client
 	WS     http.Handler // IRC over WebSocket
 	Files  FileRoutes   // uploads and downloads
+	Avatar AvatarRoutes // profile pictures
+}
+
+// AvatarRoutes are the handlers of profile pictures (internal/files).
+type AvatarRoutes interface {
+	Upload(http.ResponseWriter, *http.Request)
+	Delete(http.ResponseWriter, *http.Request)
+	Serve(http.ResponseWriter, *http.Request)
 }
 
 // FileRoutes are the handlers of file sharing (internal/files).
@@ -55,6 +63,11 @@ func NewHandler(opts Options) http.Handler {
 		mux.HandleFunc("GET /f/{id}/{name}", opts.Files.Serve)
 		mux.HandleFunc("DELETE /f/{id}", opts.Files.Delete)
 		mux.HandleFunc("DELETE /f/{id}/{name}", opts.Files.Delete)
+	}
+	if opts.Avatar != nil {
+		mux.HandleFunc("POST /avatar", opts.Avatar.Upload)
+		mux.HandleFunc("DELETE /avatar", opts.Avatar.Delete)
+		mux.HandleFunc("GET /avatar/{nick}", opts.Avatar.Serve)
 	}
 	return SecurityHeaders(mux)
 }

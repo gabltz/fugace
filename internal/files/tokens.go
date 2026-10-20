@@ -43,20 +43,24 @@ func random(n int) ([]byte, error) {
 	return b, nil
 }
 
-// Issue creates a token and returns it with its revoke func.
-func (t *Tokens) Issue() (string, func(), error) {
+// Issue creates a token for an author identity (see server.AccountHooks)
+// and returns it with its revoke func. An empty owner gets a random one.
+func (t *Tokens) Issue(owner string) (string, func(), error) {
 	tb, err := random(tokenBytes)
 	if err != nil {
 		return "", nil, err
 	}
-	ob, err := random(tokenBytes)
-	if err != nil {
-		return "", nil, err
+	if owner == "" {
+		ob, err := random(tokenBytes)
+		if err != nil {
+			return "", nil, err
+		}
+		owner = hex.EncodeToString(ob)
 	}
 	token := base64.RawURLEncoding.EncodeToString(tb)
 	key := sha256.Sum256([]byte(token))
 	t.mu.Lock()
-	t.byID[key] = &holder{owner: hex.EncodeToString(ob), bucket: limits.NewBucket(t.burst, t.interval)}
+	t.byID[key] = &holder{owner: owner, bucket: limits.NewBucket(t.burst, t.interval)}
 	t.mu.Unlock()
 	var once sync.Once
 	revoke := func() {
