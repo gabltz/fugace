@@ -333,7 +333,7 @@ func TestStore(t *testing.T) {
 
 func TestTokens(t *testing.T) {
 	tk := NewTokens(2, 10*time.Second)
-	tok, revoke, err := tk.Issue()
+	tok, revoke, err := tk.Issue("")
 	if err != nil || len(tok) != 22 {
 		t.Fatalf("issue: %q %v", tok, err)
 	}
@@ -379,7 +379,7 @@ func newFixture(t *testing.T) *fixture {
 	c := &clock{time.Unix(1_000_000, 0)}
 	st := NewStore(1<<20, time.Hour, c.now)
 	tk := NewTokens(3, 10*time.Second)
-	tok, revoke, err := tk.Issue()
+	tok, revoke, err := tk.Issue("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +524,7 @@ func TestDelete(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &reply); err != nil {
 		t.Fatal(err)
 	}
-	other, _, _ := f.tokens.Issue()
+	other, _, _ := f.tokens.Issue("")
 	if rec := f.get(t, http.MethodDelete, reply.ID, other); rec.Code != http.StatusForbidden {
 		t.Fatalf("delete by other = %d", rec.Code)
 	}
@@ -567,7 +567,7 @@ func TestUploadBudgetUnderConcurrency(t *testing.T) {
 		}
 	}()
 	for range conns {
-		tok, _, err := tk.Issue()
+		tok, _, err := tk.Issue("")
 		if err != nil {
 			t.Fatal(err)
 		}

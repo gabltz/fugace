@@ -118,6 +118,22 @@ func (s *Store) Delete(id, owner string) error {
 	return nil
 }
 
+// DeleteOwner removes every file of owner and returns how many there were.
+func (s *Store) DeleteOwner(owner string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for e := s.order.Front(); e != nil; {
+		next := e.Next()
+		if e.Value.(*File).Owner == owner {
+			s.removeLocked(e)
+			n++
+		}
+		e = next
+	}
+	return n
+}
+
 // Usage returns the bytes held and the number of files.
 func (s *Store) Usage() (int64, int) {
 	s.mu.Lock()

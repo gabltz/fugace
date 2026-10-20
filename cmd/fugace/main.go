@@ -137,6 +137,7 @@ type app struct {
 func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 	a := &app{cfg: cfg, files: files.NewStore(cfg.FilesMaxBytes, cfg.FileTTL, nil)}
 	tokens := files.NewTokens(limits.UploadBurst, limits.UploadInterval)
+	avatars := files.NewAvatars()
 	defer func() {
 		if err != nil {
 			a.closeListeners() // a, not the nil being returned
@@ -149,6 +150,7 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 		Channels:        cfg.Channels,
 		HistoryMaxBytes: cfg.HistoryMaxBytes,
 		Uploads:         tokens,
+		Account:         accountHooks{files: a.files, avatars: avatars},
 	}); err != nil {
 		return nil, fmt.Errorf("chat server: %w", err)
 	}
@@ -159,7 +161,10 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 	fileHandler := files.NewHandler(files.HandlerOptions{
 		Store: a.files, Tokens: tokens, MaxUpload: cfg.MaxUploadBytes, PublicURL: publicURL(cfg),
 	})
-	appHandler := web.NewHandler(web.Options{Static: static, WS: transport.WSHandler(a.chat, cfg.TrustedProxies), Files: fileHandler})
+	avatarHandler := files.NewAvatarHandler(fileHandler, avatars, a.chat.OwnerOf, a.chat.AvatarChanged)
+	appHandler := web.NewHandler(web.Options{
+		Static: static, WS: transport.WSHandler(a.chat, cfg.TrustedProxies), Files: fileHandler, Avatar: avatarHandler,
+	})
 
 	if cfg.TLS == config.TLSOff {
 		if err := a.addHTTP("http", cfg.HTTPAddr, appHandler, nil); err != nil {
@@ -190,6 +195,24 @@ func listen(cfg *config.Config, statusAddr string) (_ *app, err error) {
 	}
 	return a, nil
 }
+
+// accountHooks connects the chat core to the files and pictures an author
+// owns (ADR 0012).
+type accountHooks struct {
+	files   *files.Store
+	avatars *files.Avatars
+}
+
+func (h accountHooks) AvatarVersion(owner string) int { return h.avatars.Version(owner) }
+
+func (h accountHooks) Cleared(owner string) {
+	h.files.DeleteOwner(owner)
+	h.avatars.Delete(owner)
+}
+
+// Gone drops the picture of an author whose last connection ended; their
+// shared files keep their normal lifetime.
+func (h accountHooks) Gone(owner string) { h.avatars.Delete(owner) }
 
 // publicURL is FUGACE_PUBLIC_URL, else https://<first FUGACE_HOST> when TLS
 // is on, else nil (the request Host is used).

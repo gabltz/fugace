@@ -1,0 +1,2 @@
+go test fuzz v1
+string("KEY aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nNICK a\nUSER a 0 * :a\nJOIN #general\nPRIVMSG #general :x\nREDACT #general x\nREDACT a nope :why\nCLEAR-ACCOUNT")
